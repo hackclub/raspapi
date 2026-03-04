@@ -3,8 +3,8 @@ import "../styles/global.css";
 import { getCollection } from "astro:content";
 
 interface Props {
-  title: string;
-  description?: string;
+	title: string;
+	description?: string;
 }
 
 const { title, description } = Astro.props;
@@ -12,33 +12,33 @@ const { title, description } = Astro.props;
 const guides = await getCollection("guides");
 
 const grouped = guides.reduce(
-  (acc, guide) => {
-    const parts = guide.id.split("/");
-    const category = parts.length > 1 ? parts[0] : "general";
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(guide);
-    return acc;
-  },
-  {} as Record<string, typeof guides>,
+	(acc, guide) => {
+		const parts = guide.id.split("/");
+		const category = parts.length > 1 ? parts[0] : "general";
+		if (!acc[category]) acc[category] = [];
+		acc[category].push(guide);
+		return acc;
+	},
+	{} as Record<string, typeof guides>,
 );
 
 const sidebarOrder = ["about", "building", "hosting"];
 const sortedCategories = sidebarOrder
-  .map((cat) => [cat, grouped[cat] || []] as [string, typeof guides])
-  .filter(([, items]) => items.length > 0);
+	.map((cat) => [cat, grouped[cat] || []] as [string, typeof guides])
+	.filter(([, items]) => items.length > 0);
 
 for (const [, items] of sortedCategories) {
-  items.sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0));
+	items.sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0));
 }
 
 function formatCategory(cat: string): string {
-  if (cat === "about") return "About";
-  if (cat === "building") return "Building";
-  if (cat === "hosting") return "Hosting";
-  return cat
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+	if (cat === "about") return "About";
+	if (cat === "building") return "Building";
+	if (cat === "hosting") return "Hosting";
+	return cat
+		.split("-")
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
 }
 
 const currentPath = Astro.url.pathname;

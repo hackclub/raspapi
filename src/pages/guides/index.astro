@@ -7,34 +7,34 @@ export const prerender = true;
 const guides = await getCollection("guides");
 
 const grouped = guides.reduce(
-  (acc, guide) => {
-    const parts = guide.id.split("/");
-    const category = parts.length > 1 ? parts[0] : "general";
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(guide);
-    return acc;
-  },
-  {} as Record<string, typeof guides>,
+	(acc, guide) => {
+		const parts = guide.id.split("/");
+		const category = parts.length > 1 ? parts[0] : "general";
+		if (!acc[category]) acc[category] = [];
+		acc[category].push(guide);
+		return acc;
+	},
+	{} as Record<string, typeof guides>,
 );
 
 const categoryOrder = ["general", "building", "hosting"];
 const sortedCategories = Object.entries(grouped).sort(([a], [b]) => {
-  const aIndex = categoryOrder.indexOf(a);
-  const bIndex = categoryOrder.indexOf(b);
-  const aOrder = aIndex === -1 ? 999 : aIndex;
-  const bOrder = bIndex === -1 ? 999 : bIndex;
-  return aOrder - bOrder;
+	const aIndex = categoryOrder.indexOf(a);
+	const bIndex = categoryOrder.indexOf(b);
+	const aOrder = aIndex === -1 ? 999 : aIndex;
+	const bOrder = bIndex === -1 ? 999 : bIndex;
+	return aOrder - bOrder;
 });
 
 for (const [, items] of sortedCategories) {
-  items.sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0));
+	items.sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0));
 }
 
 function formatCategory(cat: string): string {
-  return cat
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+	return cat
+		.split("-")
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
 }
 ---
 

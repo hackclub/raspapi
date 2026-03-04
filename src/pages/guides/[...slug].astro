@@ -5,21 +5,21 @@ import { getCollection, render, type CollectionEntry } from "astro:content";
 export const prerender = true;
 
 export async function getStaticPaths() {
-  const guides = await getCollection("guides");
-  return guides.map((guide) => ({
-    params: { slug: guide.id },
-    props: { guide },
-  }));
+	const guides = await getCollection("guides");
+	return guides.map((guide) => ({
+		params: { slug: guide.id },
+		props: { guide },
+	}));
 }
 
 interface Props {
-  guide: CollectionEntry<"guides">;
+	guide: CollectionEntry<"guides">;
 }
 
 const { guide } = Astro.props;
 
 if (!guide) {
-  return Astro.redirect("/guides");
+	return Astro.redirect("/guides");
 }
 
 const { Content } = await render(guide);
