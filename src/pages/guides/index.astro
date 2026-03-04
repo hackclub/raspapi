@@ -14,7 +14,7 @@ const grouped = guides.reduce(
     acc[category].push(guide);
     return acc;
   },
-  {} as Record<string, typeof guides>
+  {} as Record<string, typeof guides>,
 );
 
 const categoryOrder = ["general", "building", "hosting"];
