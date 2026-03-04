@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 
+// don't remove for now
 const pastProjects = [
   {
     name: "Cachet",
@@ -22,130 +23,195 @@ const pastProjects = [
 ---
 
 <Layout>
-  <a
-    href="https://hackclub.com"
-    target="_blank"
-    rel="noopener noreferrer"
-    class="fixed top-0 left-0 z-50"
-  >
+  <main class="homepage min-h-screen w-full relative overflow-hidden">
+    <h1 class="hero-title select-none">RASPAPI</h1>
+
     <img
-      src="https://assets.hackclub.com/flag-orpheus-top.svg"
-      alt="Hack Club"
-      class="w-24 md:w-32"
+      src="/rpizero-topdown.png"
+      alt="Raspberry Pi Zero 2W — top-down view"
+      class="pi-image pointer-events-none select-none"
+      draggable="false"
     />
-  </a>
 
-  <canvas id="bg" class="fixed inset-0 w-full h-full -z-10"></canvas>
+    <div class="mobile-btns">
+      <a href="/guides" class="side-btn side-btn--left"> GUIDES </a>
 
-  <main
-    class="h-screen w-full flex flex-col items-center justify-center px-6 relative"
-  >
-    <h1
-      class="font-['Syne',sans-serif] font-extrabold text-6xl md:text-8xl tracking-wider text-white mb-4"
-    >
-      RASPAPI
-    </h1>
-
-    <p class="text-lg md:text-xl text-[#a3a3a3] mb-8">
-      Build an API. Get a Raspberry Pi Zero 2W to host it on.
-    </p>
-
-    <p class="text-[#737373] mb-10">
-      <a
-        href="/guides/about"
-        class="hover:text-white transition-colors underline"
-      >
-        View requirements
-      </a>
-    </p>
-
-    <div class="flex gap-4 mb-10">
-      <button
-        type="button"
-        disabled
-        class="px-6 py-3 bg-[#c41e3a]/40 text-white/60 font-medium rounded-lg cursor-not-allowed"
-      >
-        Submit
+      <button type="button" disabled class="side-btn side-btn--right">
+        SUBMIT
       </button>
-      <a
-        href="/guides"
-        class="px-6 py-3 border border-[#262626] hover:border-[#404040] text-[#a3a3a3] hover:text-white font-medium rounded-lg transition-colors"
-      >
-        Guides
-      </a>
     </div>
 
-    <div class="text-center max-w-md">
-      <p class="text-xs text-[#525252] uppercase tracking-wider mb-3">
-        Past projects
-      </p>
-      <div class="space-y-2">
-        {
-          pastProjects.map((project) => (
-            <p class="text-sm">
-              <>
-                <a
-                  href={project.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-[#a3a3a3] hover:text-white transition-colors"
-                >
-                  {project.name}:
-                </a>
-                <span class="text-[#525252]">{project.description}</span>
-              </>
-            </p>
-          ))
-        }
-      </div>
-    </div>
-
-    <!-- <p class="text-xs text-[#404040]">Raspberry Pi Zero 2W</p> -->
+    <p class="tagline">
+      BUILD AN API. GET A RASPBERRY PI ZERO 2W TO HOST IT ON.
+    </p>
   </main>
 </Layout>
 
-<script>
-  import * as THREE from "three";
-
-  const canvas = document.getElementById("bg") as HTMLCanvasElement;
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: true,
-  });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-  camera.position.z = 4;
-
-  const geometry = new THREE.IcosahedronGeometry(2, 1);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xc41e3a,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.12,
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  scene.add(mesh);
-
-  function animate() {
-    requestAnimationFrame(animate);
-    mesh.rotation.x += 0.001;
-    mesh.rotation.y += 0.002;
-    renderer.render(scene, camera);
+<style>
+  .homepage {
+    background-image: url("https://www.transparenttextures.com/patterns/axiom-pattern.png");
+    background-repeat: repeat;
   }
-  animate();
 
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-</script>
+  .hero-title {
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: "Syne", sans-serif;
+    font-weight: 800;
+    font-size: clamp(4.5rem, 10vw, 12rem);
+    letter-spacing: 0.18em;
+    color: #fff;
+    z-index: 1;
+    text-align: center;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .tagline {
+    position: fixed;
+    bottom: 1.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    margin: 0;
+    font-family: "Syne", sans-serif;
+    font-weight: 700;
+    font-size: 0.65rem;
+    letter-spacing: 0.45em;
+    color: #525252;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .pi-image {
+    position: absolute;
+    bottom: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    width: min(90vw, 950px);
+    height: auto;
+    filter: drop-shadow(0 12px 60px rgba(0, 0, 0, 0.6));
+  }
+
+  .side-btn {
+    position: fixed;
+    z-index: 40;
+    top: 50%;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-family: "Syne", sans-serif;
+    font-weight: 800;
+    font-size: 0.875rem;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    padding: 1.5rem 0.75rem;
+    border: 2px solid #404040;
+    background: rgba(10, 10, 10, 0.9);
+    color: #e5e5e5;
+    text-decoration: none;
+    transition:
+      border-color 0.2s,
+      color 0.2s,
+      background 0.2s;
+    cursor: pointer;
+  }
+
+  .side-btn:hover {
+    border-color: #c41e3a;
+    color: #fff;
+    background: rgba(196, 30, 58, 0.1);
+  }
+
+  .side-btn--left {
+    left: 0;
+  }
+
+  .side-btn--right {
+    right: 0;
+    transform: none;
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .side-btn--right:hover {
+    color: #e5e5e5;
+    border-color: #404040;
+    background: rgba(10, 10, 10, 0.9);
+  }
+
+  .mobile-btns {
+    display: contents;
+  }
+
+  /* mobile nonsense */
+  @media (max-width: 768px) {
+    .homepage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100dvh;
+      padding: 0 1rem 4rem;
+    }
+
+    .hero-title {
+      position: relative;
+      top: auto;
+      left: auto;
+      transform: none;
+      margin-top: 3rem;
+      font-size: clamp(3rem, 12vw, 5rem);
+    }
+
+    .pi-image {
+      position: relative;
+      bottom: auto;
+      left: auto;
+      transform: none;
+      width: 90vw;
+      max-width: 500px;
+      margin-top: 1.5rem;
+    }
+
+    .mobile-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 500px;
+      margin-top: 2rem;
+      z-index: 40;
+    }
+
+    .side-btn {
+      position: static;
+      writing-mode: horizontal-tb;
+      text-orientation: initial;
+      transform: none;
+      width: 100%;
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.4em;
+    }
+
+    .side-btn--right {
+      transform: none;
+    }
+
+    .tagline {
+      position: relative;
+      bottom: auto;
+      left: auto;
+      transform: none;
+      margin-top: 2rem;
+      white-space: normal;
+      font-size: 0.55rem;
+      letter-spacing: 0.3em;
+      padding: 0 0.5rem;
+    }
+  }
+</style>
