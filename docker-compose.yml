@@ -2,8 +2,6 @@ services:
   raspapi:
     build: .
     container_name: raspapi
-    ports:
-      - "4321:4321"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
