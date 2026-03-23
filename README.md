@@ -2,7 +2,7 @@
 
 RaspAPI is a YSWS where you ship your own API, and Hack Club ships you a Raspberry Pi to run it on.
 
-See the original [RaspAPI](https://raspapi.hackclub.com) and the current [demo site](https://raspapi.halceon.dev).
+Check out the site [here](https://raspapi.hackclub.com)!
 
 ## Contributing
 
