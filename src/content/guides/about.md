@@ -22,5 +22,5 @@ Before submitting your project, make sure you meet the following requirements:
 - At least one endpoint should support query parameters or filtering of some sort.
 - Your API should be usable by anyone. If it requires auth or API keys, make sure there's a way for people to easily get access, such as with a demo key on your docs.
 - Your code should be in a public git repo with a (hand-written, please) README explaining what it is.
-<!-- - You must have tracked 7 or more hours on Hackatime. -->
+- You must have tracked 7 or more hours on Hackatime.
 - Make something cool and have fun!
