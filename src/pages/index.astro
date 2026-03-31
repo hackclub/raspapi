@@ -1,24 +1,23 @@
 ---
 import Layout from "../layouts/Layout.astro";
 
-// don't remove for now
 const pastProjects = [
-	{
-		name: "Cachet",
-		description:
-			"A *really fast* proxy to quickly grab Hack Club Slack profile pictures without Slack API hassle.",
-		link: "https://cachet.dunkirk.sh",
-	},
-	{
-		name: "Battleships API",
-		description: "Play an entire game of Battleships over an API.",
-		link: "https://github.com/pbhak/battleships-api",
-	},
-	{
-		name: "ytdlp Web API",
-		description: "Download Youtube videos with one call.",
-		link: "https://github.com/duykhanh09103/ytdlp-web-api",
-	},
+  {
+    name: "Cachet",
+    description:
+      "A *really fast* proxy to quickly grab Hack Club Slack profile pictures without Slack API hassle.",
+    link: "https://cachet.dunkirk.sh",
+  },
+  {
+    name: "Battleships API",
+    description: "Play an entire game of Battleships over an API.",
+    link: "https://github.com/pbhak/battleships-api",
+  },
+  {
+    name: "ytdlp Web API",
+    description: "Download Youtube videos with one call.",
+    link: "https://github.com/duykhanh09103/ytdlp-web-api",
+  },
 ];
 ---
 
@@ -79,15 +78,18 @@ const pastProjects = [
       <ul class="req-list">
         <li>Publicly accessible API with a stable URL (no ephemeral links)</li>
         <li>
-          At least <strong>5 GET</strong> endpoints and <strong>2 POST</strong> endpoints (or similar complexity)
+          At least <strong>5 GET</strong> endpoints and <strong>2 POST</strong> endpoints
+          (or similar complexity)
         </li>
         <li>Some form of data persistence (e.g. stats)</li>
         <li>
-          Docs at <code>/docs</code> (handwritten or auto-generated), clearly explaining endpoints with example requests
+          Docs at <code>/docs</code> (handwritten or auto-generated), clearly explaining
+          endpoints with example requests
         </li>
         <li>At least one endpoint supports query parameters or filtering</li>
         <li>
-          Usable by anyone. If auth is required, provide easy access (e.g. a demo key in your docs)
+          Usable by anyone. If auth is required, provide easy access (e.g. a
+          demo key in your docs)
         </li>
         <li>Public git repo with a hand-written README</li>
         <li><strong>7+ hours</strong> tracked on Hackatime</li>
@@ -114,8 +116,14 @@ const pastProjects = [
       </section>
 
       <section class="info-section cta-section">
-        <a href="/guides" class="cta-link">READ THE GUIDES &rarr;</a>
+        <a href="/guides" class="cta-link">READ THE GUIDES </a>
       </section>
+    </section>
+
+    <section class="info-section canvas-section">
+      <canvas id="pixel-canvas"></canvas>
+      <div class="palette" id="palette"></div>
+      <pre class="curl-example" id="curl-example"></pre>
     </section>
   </main>
 
@@ -377,8 +385,65 @@ const pastProjects = [
       background: rgba(196, 30, 58, 0.1);
     }
 
+    /* canvas */
+    .canvas-section {
+      border-bottom: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    #pixel-canvas {
+      display: block;
+      border: 1px solid #262626;
+      cursor: crosshair;
+      image-rendering: pixelated;
+    }
+
+    .palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    :global(.swatch) {
+      width: 20px;
+      height: 20px;
+      border: 1px solid #262626;
+      cursor: pointer;
+      transition: outline 0.1s;
+    }
+
+    :global(.swatch[data-color="#0a0a0a"]) {
+      border-color: #404040;
+    }
+
+    :global(.swatch.active) {
+      outline: 2px solid #e5e5e5;
+      outline-offset: 1px;
+    }
+
+    .curl-example {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #525252;
+      margin: 0;
+      line-height: 1.6;
+      white-space: pre;
+      transition: color 0.15s;
+    }
+
+    .curl-example.copied {
+      color: #e5e5e5;
+    }
+
     /* mobile */
     @media (max-width: 768px) {
+      .canvas-section {
+        display: none;
+      }
       .hero {
         display: flex;
         flex-direction: column;
@@ -468,3 +533,145 @@ const pastProjects = [
     }
   </style>
 </Layout>
+
+<script>
+  const CELL = 10;
+  const WIDTH = 32;
+  const HEIGHT = 32;
+  const POLL_MS = 3000;
+
+  const COLORS = [
+    "#0a0a0a",
+    "#c41e3a",
+    "#e5e5e5",
+    "#404040",
+    "#3b82f6",
+    "#22c55e",
+    "#eab308",
+    "#a855f7",
+    "#f97316",
+  ];
+
+  const canvas = document.getElementById("pixel-canvas") as HTMLCanvasElement;
+  if (!canvas) throw new Error("canvas not found");
+  const ctx = canvas.getContext("2d")!;
+  const curlEl = document.getElementById("curl-example")!;
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = WIDTH * CELL * dpr;
+  canvas.height = HEIGHT * CELL * dpr;
+  canvas.style.width = `${WIDTH * CELL}px`;
+  canvas.style.height = `${HEIGHT * CELL}px`;
+  ctx.scale(dpr, dpr);
+
+  let pixels: string[] = Array(WIDTH * HEIGHT).fill("#0a0a0a");
+  let selectedColor = "#c41e3a";
+  let selectedCell: { x: number; y: number } | null = null;
+  let hoverCell: { x: number; y: number } | null = null;
+
+  function curlCommand(x: number | null, y: number | null): string {
+    const xStr = x !== null ? String(x) : "—";
+    const yStr = y !== null ? String(y) : "—";
+    const url = `${window.location.origin}/api/canvas`;
+    return (
+      `$ curl -X POST ${url} \\\n` +
+      `  -H 'Content-Type: application/json' \\\n` +
+      `  -d '{"x":${xStr},"y":${yStr},"color":"${selectedColor}"}'`
+    );
+  }
+
+  function updateCurl(x: number | null, y: number | null) {
+    curlEl.textContent = curlCommand(x, y);
+  }
+
+  const palette = document.getElementById("palette")!;
+  for (const color of COLORS) {
+    const swatch = document.createElement("div");
+    swatch.className = "swatch" + (color === selectedColor ? " active" : "");
+    swatch.style.background = color;
+    swatch.dataset.color = color;
+    swatch.title = color === "#0a0a0a" ? "erase" : color;
+    swatch.addEventListener("click", () => {
+      selectedColor = color;
+      document
+        .querySelectorAll(".swatch")
+        .forEach((s) => s.classList.remove("active"));
+      swatch.classList.add("active");
+      render();
+      updateCurl(selectedCell?.x ?? null, selectedCell?.y ?? null);
+    });
+    palette.appendChild(swatch);
+  }
+
+  function render() {
+    for (let y = 0; y < HEIGHT; y++) {
+      for (let x = 0; x < WIDTH; x++) {
+        ctx.fillStyle = pixels[y * WIDTH + x];
+        ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+      }
+    }
+    if (hoverCell) {
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = selectedColor;
+      ctx.fillRect(hoverCell.x * CELL, hoverCell.y * CELL, CELL, CELL);
+      ctx.globalAlpha = 1;
+    }
+    if (selectedCell) {
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        selectedCell.x * CELL + 0.5,
+        selectedCell.y * CELL + 0.5,
+        CELL - 1,
+        CELL - 1,
+      );
+    }
+  }
+
+  async function fetchCanvas() {
+    try {
+      const res = await fetch("/api/canvas");
+      const data = await res.json();
+      pixels = data.canvas;
+      render();
+    } catch {}
+  }
+
+  function getCellFromEvent(e: MouseEvent): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - rect.left) / rect.width) * WIDTH);
+    const y = Math.floor(((e.clientY - rect.top) / rect.height) * HEIGHT);
+    return {
+      x: Math.max(0, Math.min(x, WIDTH - 1)),
+      y: Math.max(0, Math.min(y, HEIGHT - 1)),
+    };
+  }
+
+  canvas.addEventListener("mousemove", (e) => {
+    const { x, y } = getCellFromEvent(e);
+    hoverCell = { x, y };
+    render();
+    updateCurl(x, y);
+  });
+
+  canvas.addEventListener("mouseleave", () => {
+    hoverCell = null;
+    render();
+    updateCurl(selectedCell?.x ?? null, selectedCell?.y ?? null);
+  });
+
+  canvas.addEventListener("click", (e) => {
+    const { x, y } = getCellFromEvent(e);
+    selectedCell = { x, y };
+    render();
+    updateCurl(x, y);
+    navigator.clipboard.writeText(curlCommand(x, y)).then(() => {
+      curlEl.classList.add("copied");
+      setTimeout(() => curlEl.classList.remove("copied"), 700);
+    });
+  });
+
+  updateCurl(null, null);
+  fetchCanvas();
+  setInterval(fetchCanvas, POLL_MS);
+</script>
