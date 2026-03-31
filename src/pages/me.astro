@@ -5,34 +5,42 @@ import { getSession } from "../lib/session";
 const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
 if (!session) return Astro.redirect("/auth/login");
 
+const adminIds = (import.meta.env.ADMIN_IDS ?? "")
+	.split(",")
+	.map((s: string) => s.trim())
+	.filter(Boolean);
+const isAdmin = adminIds.includes(session.slack_id);
+
 interface ShopItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  imageUrl?: string;
+	id: string;
+	name: string;
+	description: string;
+	price: number;
+	imageUrl?: string;
 }
 
 let shopItems: ShopItem[] = [];
 try {
-  const res = await fetch(
-    `https://api.airtable.com/v0/${import.meta.env.AIRTABLE_BASE_ID}/Shop%20Items`,
-    {
-      headers: {
-        Authorization: `Bearer ${import.meta.env.AIRTABLE_API_KEY}`,
-      },
-    }
-  );
-  if (res.ok) {
-    const data = await res.json();
-    shopItems = (data.records ?? []).map((r: { id: string; fields: Record<string, unknown> }) => ({
-      id: r.id,
-      name: (r.fields.Name as string) ?? "",
-      description: (r.fields.Description as string) ?? "",
-      price: (r.fields.Price as number) ?? 0,
-      imageUrl: (r.fields.Image as string | undefined) ?? undefined,
-    }));
-  }
+	const res = await fetch(
+		`https://api.airtable.com/v0/${import.meta.env.AIRTABLE_BASE_ID}/Shop%20Items`,
+		{
+			headers: {
+				Authorization: `Bearer ${import.meta.env.AIRTABLE_API_KEY}`,
+			},
+		},
+	);
+	if (res.ok) {
+		const data = await res.json();
+		shopItems = (data.records ?? []).map(
+			(r: { id: string; fields: Record<string, unknown> }) => ({
+				id: r.id,
+				name: (r.fields.Name as string) ?? "",
+				description: (r.fields.Description as string) ?? "",
+				price: (r.fields.Price as number) ?? 0,
+				imageUrl: (r.fields.Image as string | undefined) ?? undefined,
+			}),
+		);
+	}
 } catch (_) {}
 ---
 
@@ -48,35 +56,48 @@ try {
         />
         <p class="name" data-slack-id={session.slack_id}>&nbsp;</p>
       </div>
-      <a href="/auth/logout" class="logout">sign out</a>
+      <div class="actions">
+        {
+          isAdmin && (
+            <a href="/admin/users" class="logout">
+              admin
+            </a>
+          )
+        }
+        <a href="/auth/logout" class="logout">sign out</a>
+      </div>
     </header>
 
     <section class="shop">
       <span class="shop-label">SHOP</span>
-      {shopItems.length === 0 ? (
-        <p class="empty">no items available</p>
-      ) : (
-        <div class="grid">
-          {shopItems.map((item) => (
-            <div class="item">
-              <div class="item-image">
-                {item.imageUrl ? (
-                  <img src={item.imageUrl} alt={item.name} />
-                ) : (
-                  <span class="fallback">🍓</span>
-                )}
-              </div>
-              <div class="item-info">
-                <div>
-                  <p class="item-name">{item.name}</p>
-                  {item.description && <p class="item-desc">{item.description}</p>}
+      {
+        shopItems.length === 0 ? (
+          <p class="empty">no items available</p>
+        ) : (
+          <div class="grid">
+            {shopItems.map((item) => (
+              <div class="item">
+                <div class="item-image">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.name} />
+                  ) : (
+                    <span class="fallback">🍓</span>
+                  )}
                 </div>
-                <p class="item-price">{item.price} raspberries</p>
+                <div class="item-info">
+                  <div>
+                    <p class="item-name">{item.name}</p>
+                    {item.description && (
+                      <p class="item-desc">{item.description}</p>
+                    )}
+                  </div>
+                  <p class="item-price">{item.price} raspberries</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )
+      }
     </section>
   </main>
 
@@ -117,6 +138,11 @@ try {
       font-size: 1rem;
       color: #f5f5f5;
       margin: 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 1rem;
     }
 
     .logout {

@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { setSessionCookie } from "../../lib/session";
+import { upsertUser } from "../../lib/airtable";
 
 export const GET: APIRoute = async ({ url }) => {
 	const code = url.searchParams.get("code");
@@ -46,6 +47,8 @@ export const GET: APIRoute = async ({ url }) => {
 		return Response.redirect(
 			`${import.meta.env.PUBLIC_BASE_URL}/?error=not_eligible`,
 		);
+
+	await upsertUser(slack_id);
 
 	const cookie = await setSessionCookie(
 		{ slack_id },

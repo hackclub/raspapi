@@ -1,0 +1,125 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getSession } from "../../lib/session";
+import { getAllUsers } from "../../lib/airtable";
+
+const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
+if (!session) return Astro.redirect("/auth/login");
+
+const adminIds = (import.meta.env.ADMIN_IDS ?? "")
+	.split(",")
+	.map((s: string) => s.trim())
+	.filter(Boolean);
+if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
+
+const users = await getAllUsers();
+---
+
+<Layout>
+  <main class="page">
+    <header class="topbar">
+      <span class="label">ADMIN</span>
+      <a href="/me" class="back">back</a>
+    </header>
+
+    <section class="content">
+      <p class="count">{users.length} user{users.length !== 1 ? "s" : ""}</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Slack ID</th>
+            <th>Airtable ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            users.map((u, i) => (
+              <tr>
+                <td class="num">{i + 1}</td>
+                <td>{u.slack_id}</td>
+                <td class="muted">{u.id}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <style>
+    .page {
+      min-height: 100vh;
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 7rem;
+    }
+
+    .label {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      color: #c41e3a;
+    }
+
+    .back {
+      font-size: 0.75rem;
+      color: #525252;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .count {
+      font-size: 0.8rem;
+      color: #525252;
+      margin: 0;
+    }
+
+    .table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.875rem;
+    }
+
+    .table th {
+      text-align: left;
+      padding: 0.5rem 1rem;
+      font-family: "Syne", sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: #525252;
+      border-bottom: 1px solid #262626;
+    }
+
+    .table td {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid #1a1a1a;
+      color: #f5f5f5;
+    }
+
+    .num {
+      color: #525252;
+      width: 3rem;
+    }
+
+    .muted {
+      color: #525252;
+      font-size: 0.8rem;
+    }
+  </style>
+</Layout>
