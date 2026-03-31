@@ -1,0 +1,244 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getSession } from "../lib/session";
+
+const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
+if (!session) return Astro.redirect("/auth/login");
+
+interface ShopItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  imageUrl?: string;
+}
+
+let shopItems: ShopItem[] = [];
+try {
+  const res = await fetch(
+    `https://api.airtable.com/v0/${import.meta.env.AIRTABLE_BASE_ID}/Shop%20Items`,
+    {
+      headers: {
+        Authorization: `Bearer ${import.meta.env.AIRTABLE_API_KEY}`,
+      },
+    }
+  );
+  if (res.ok) {
+    const data = await res.json();
+    shopItems = (data.records ?? []).map((r: { id: string; fields: Record<string, unknown> }) => ({
+      id: r.id,
+      name: (r.fields.Name as string) ?? "",
+      description: (r.fields.Description as string) ?? "",
+      price: (r.fields.Price as number) ?? 0,
+      imageUrl: (r.fields.Image as string | undefined) ?? undefined,
+    }));
+  }
+} catch (_) {}
+---
+
+<Layout>
+  <main class="page">
+    <header class="topbar">
+      <div class="profile">
+        <img
+          class="avatar"
+          alt="avatar"
+          data-slack-id={session.slack_id}
+          style="visibility:hidden"
+        />
+        <p class="name" data-slack-id={session.slack_id}>&nbsp;</p>
+      </div>
+      <a href="/auth/logout" class="logout">sign out</a>
+    </header>
+
+    <section class="shop">
+      <span class="shop-label">SHOP</span>
+      {shopItems.length === 0 ? (
+        <p class="empty">no items available</p>
+      ) : (
+        <div class="grid">
+          {shopItems.map((item) => (
+            <div class="item">
+              <div class="item-image">
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt={item.name} />
+                ) : (
+                  <span class="fallback">🍓</span>
+                )}
+              </div>
+              <div class="item-info">
+                <div>
+                  <p class="item-name">{item.name}</p>
+                  {item.description && <p class="item-desc">{item.description}</p>}
+                </div>
+                <p class="item-price">{item.price} raspberries</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  </main>
+
+  <style>
+    .page {
+      min-height: 100vh;
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 7rem;
+    }
+
+    .profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #1a1a1a;
+      flex-shrink: 0;
+    }
+
+    .name {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: #f5f5f5;
+      margin: 0;
+    }
+
+    .logout {
+      font-size: 0.75rem;
+      color: #525252;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .shop {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .shop-label {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      color: #c41e3a;
+    }
+
+    .empty {
+      font-size: 0.875rem;
+      color: #525252;
+      margin: 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1px;
+      border: 1px solid #262626;
+    }
+
+    .item {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #262626;
+      border-bottom: 1px solid #262626;
+      margin-right: -1px;
+      margin-bottom: -1px;
+    }
+
+    .item-image {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      background: #111;
+      flex-shrink: 0;
+    }
+
+    .item-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .fallback {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+    }
+
+    .item-info {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex: 1;
+    }
+
+    .item-name {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #f5f5f5;
+      margin: 0 0 0.35rem 0;
+    }
+
+    .item-desc {
+      font-size: 0.85rem;
+      color: #737373;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .item-price {
+      font-size: 0.8rem;
+      color: #c41e3a;
+      margin: 0;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+    }
+  </style>
+
+  <script>
+    const id =
+      document.querySelector<HTMLElement>("[data-slack-id]")?.dataset.slackId;
+    if (id) {
+      fetch(`https://cachet.dunkirk.sh/users/${id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d) return;
+          const img =
+            document.querySelector<HTMLImageElement>("img[data-slack-id]");
+          if (img && d.imageUrl) {
+            img.src = d.imageUrl;
+            img.style.visibility = "visible";
+          }
+          const name = document.querySelector<HTMLElement>(
+            ".name[data-slack-id]",
+          );
+          if (name && d.displayName) name.textContent = d.displayName;
+        })
+        .catch(() => {});
+    }
+  </script>
+</Layout>
