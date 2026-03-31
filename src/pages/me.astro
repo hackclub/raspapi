@@ -1,9 +1,13 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import { getSession } from "../lib/session";
+import { getUserBySlackId } from "../lib/airtable";
 
 const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
 if (!session) return Astro.redirect("/auth/login");
+
+const userRecord = await getUserBySlackId(session.slack_id);
+const hackatimeConnected = !!userRecord?.hackatime_token;
 
 const adminIds = (import.meta.env.ADMIN_IDS ?? "")
 	.split(",")
@@ -61,6 +65,15 @@ try {
           isAdmin && (
             <a href="/admin/users" class="logout">
               admin
+            </a>
+          )
+        }
+        {
+          hackatimeConnected ? (
+            <span class="hackatime-status">hackatime connected</span>
+          ) : (
+            <a href="/auth/hackatime" class="logout">
+              connect hackatime
             </a>
           )
         }
@@ -150,6 +163,11 @@ try {
       color: #525252;
       text-decoration: underline;
       text-underline-offset: 3px;
+    }
+
+    .hackatime-status {
+      font-size: 0.75rem;
+      color: #525252;
     }
 
     .shop {
