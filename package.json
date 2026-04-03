@@ -8,6 +8,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "format": "bunx biome format --write src",
+    "format:check": "bunx biome format src",
     "check": "bunx biome check src"
   },
   "dependencies": {
