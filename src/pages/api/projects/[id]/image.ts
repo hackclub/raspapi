@@ -40,7 +40,10 @@ export const PUT: APIRoute = async ({ request, cookies, params }) => {
 	const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 	if (!image.type || !allowedTypes.includes(image.type)) {
 		return Response.json(
-			{ error: "Invalid image type. Allowed types are JPEG, PNG, GIF, and WEBP." },
+			{
+				error:
+					"Invalid image type. Allowed types are JPEG, PNG, GIF, and WEBP.",
+			},
 			{ status: 400 },
 		);
 	}

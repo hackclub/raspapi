@@ -1,0 +1,1002 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getAllProjectsBySlackId } from "../lib/airtable";
+import { getSession } from "../lib/session";
+
+const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
+if (!session) return Astro.redirect("/auth/login");
+
+const projects = await getAllProjectsBySlackId(session.slack_id);
+---
+
+<Layout>
+  <main class="page">
+    <header class="topbar">
+      <div class="profile">
+        <img
+          class="avatar"
+          alt="avatar"
+          data-slack-id={session.slack_id}
+          style="visibility:hidden"
+        />
+        <p class="name" data-slack-id={session.slack_id}>&nbsp;</p>
+      </div>
+      <div class="actions">
+        <a href="/me" class="action-link">dashboard</a>
+        <a href="/auth/logout" class="action-link">sign out</a>
+      </div>
+    </header>
+
+    <section class="projects-section">
+      <div class="section-header">
+        <span class="section-label">PROJECTS</span>
+        <button class="btn-new" id="new-project-btn">+ new project</button>
+      </div>
+
+      <div id="new-project-form" class="new-project-form hidden">
+        <input
+          id="new-project-name"
+          class="input"
+          type="text"
+          placeholder="project name"
+          maxlength="100"
+        />
+        <div class="form-actions">
+          <button class="btn-primary" id="create-project-btn">create</button>
+          <button class="btn-ghost" id="cancel-new-btn">cancel</button>
+        </div>
+        <p id="new-project-error" class="error-msg hidden"></p>
+      </div>
+
+      <div id="projects-list" class="projects-list">
+        {
+          projects.length === 0 ? (
+            <p class="empty" id="empty-msg">
+              no projects yet
+            </p>
+          ) : (
+            projects.map((project) => (
+              <div
+                class="project-card"
+                data-id={project.id}
+                data-hackatime-project={project.hackatime_project ?? ""}
+              >
+                <div class="project-header">
+                  <div class="project-title-row">
+                    <h2 class="project-name">{project.name}</h2>
+                    {project.has_pending_submission && (
+                      <span class="badge">pending</span>
+                    )}
+                  </div>
+                  <button class="btn-edit" data-id={project.id}>
+                    edit
+                  </button>
+                </div>
+
+                <div class="project-view" data-id={project.id}>
+                  <div class="project-view-info">
+                    {project.description && (
+                      <p class="project-desc">{project.description}</p>
+                    )}
+                    <div class="project-links">
+                      {project.project_url && (
+                        <a
+                          href={project.project_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="project-link"
+                        >
+                          project
+                        </a>
+                      )}
+                      {project.repo_url && (
+                        <a
+                          href={project.repo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="project-link"
+                        >
+                          repo
+                        </a>
+                      )}
+                      {project.hackatime_project && (
+                        <span class="hackatime-tag">
+                          ⏱ {project.hackatime_project}
+                        </span>
+                      )}
+                      {project.hackatime_project && (
+                        <span class="hackatime-time">…</span>
+                      )}
+                    </div>
+                    <button
+                      class="btn-ship"
+                      disabled
+                      title="Submission coming soon"
+                    >
+                      ship
+                    </button>
+                  </div>
+                  {project.image_url && (
+                    <img
+                      class="project-image"
+                      src={project.image_url}
+                      alt={project.name}
+                    />
+                  )}
+                </div>
+
+                <form
+                  class="project-edit-form hidden"
+                  data-id={project.id}
+                  autocomplete="off"
+                >
+                  <div class="field">
+                    <label class="label">name</label>
+                    <input
+                      class="input"
+                      name="name"
+                      type="text"
+                      value={project.name}
+                      maxlength="100"
+                    />
+                  </div>
+                  <div class="field">
+                    <label class="label">description</label>
+                    <textarea
+                      class="input textarea"
+                      name="description"
+                      rows="3"
+                      set:text={project.description}
+                    />
+                  </div>
+                  <div class="field">
+                    <label class="label">project url</label>
+                    <input
+                      class="input"
+                      name="project_url"
+                      type="url"
+                      value={project.project_url ?? ""}
+                      placeholder="https://"
+                    />
+                  </div>
+                  <div class="field">
+                    <label class="label">repo url</label>
+                    <input
+                      class="input"
+                      name="repo_url"
+                      type="url"
+                      value={project.repo_url ?? ""}
+                      placeholder="https://github.com/..."
+                    />
+                  </div>
+                  <div class="field">
+                    <label class="label">hackatime project</label>
+                    <select
+                      class="input hackatime-select"
+                      name="hackatime_project"
+                      data-current={project.hackatime_project ?? ""}
+                    >
+                      <option value="">-- none --</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="label">image</label>
+                    <input
+                      class="input"
+                      name="image"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                    />
+                  </div>
+                  <div class="form-actions">
+                    <button class="btn-primary" type="submit">
+                      save
+                    </button>
+                    <button
+                      class="btn-ghost cancel-edit-btn"
+                      type="button"
+                      data-id={project.id}
+                    >
+                      cancel
+                    </button>
+                    <button
+                      class="btn-delete"
+                      type="button"
+                      data-id={project.id}
+                    >
+                      delete
+                    </button>
+                  </div>
+                  <p class="error-msg hidden edit-error" />
+                </form>
+              </div>
+            ))
+          )
+        }
+      </div>
+    </section>
+  </main>
+
+  <style is:global>
+    .page {
+      min-height: 100vh;
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 7rem;
+    }
+
+    .profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #1a1a1a;
+      flex-shrink: 0;
+    }
+
+    .name {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: #f5f5f5;
+      margin: 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .action-link {
+      font-size: 0.75rem;
+      color: #525252;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .projects-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-label {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      color: #c41e3a;
+    }
+
+    .btn-new {
+      font-size: 0.75rem;
+      color: #525252;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .btn-new:hover {
+      color: #f5f5f5;
+    }
+
+    .new-project-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1.25rem;
+      border: 1px solid #262626;
+      max-width: 480px;
+    }
+
+    .projects-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      border: 1px solid #262626;
+    }
+
+    .project-card {
+      padding: 1.25rem;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .project-card:last-child {
+      border-bottom: none;
+    }
+
+    .project-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .project-title-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .project-name {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #f5f5f5;
+      margin: 0;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #c41e3a;
+      border: 1px solid #c41e3a44;
+      padding: 0.15rem 0.4rem;
+    }
+
+    .btn-edit {
+      font-size: 0.75rem;
+      color: #525252;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      flex-shrink: 0;
+    }
+
+    .btn-edit:hover {
+      color: #f5f5f5;
+    }
+
+    .project-view {
+      display: flex;
+      gap: 1.25rem;
+      align-items: flex-start;
+    }
+
+    .project-view-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+
+    .project-image {
+      width: 140px;
+      height: 140px;
+      object-fit: cover;
+      flex-shrink: 0;
+      display: block;
+      border: 1px solid #262626;
+    }
+
+    .btn-ship {
+      align-self: flex-start;
+      font-size: 0.75rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: 1px solid #262626;
+      color: #404040;
+      padding: 0.3rem 0.85rem;
+      cursor: not-allowed;
+    }
+
+    .btn-delete {
+      font-size: 0.75rem;
+      color: #525252;
+      background: none;
+      border: none;
+      cursor: pointer;
+      margin-left: auto;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .btn-delete:hover {
+      color: #c41e3a;
+    }
+
+    .project-desc {
+      font-size: 0.85rem;
+      color: #737373;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .project-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .project-link {
+      font-size: 0.75rem;
+      color: #525252;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .project-link:hover {
+      color: #f5f5f5;
+    }
+
+    .hackatime-tag {
+      font-size: 0.75rem;
+      color: #525252;
+    }
+
+    .hackatime-time {
+      font-size: 0.75rem;
+      color: #525252;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hackatime-time.error {
+      color: #c41e3a;
+      font-style: italic;
+    }
+
+    .project-edit-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .label {
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #525252;
+      text-transform: uppercase;
+    }
+
+    .input {
+      background: #111;
+      border: 1px solid #262626;
+      color: #f5f5f5;
+      font-family: "Inter", sans-serif;
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .input:focus {
+      border-color: #404040;
+    }
+
+    .input[type="file"] {
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+    }
+
+    select.input {
+      appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23525252' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      padding-right: 2rem;
+    }
+
+    select.input option {
+      background: #111;
+      color: #f5f5f5;
+    }
+
+    .hackatime-loading {
+      font-size: 0.75rem;
+      color: #525252;
+      font-style: italic;
+    }
+
+    .textarea {
+      resize: vertical;
+      min-height: 72px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .btn-primary {
+      font-size: 0.8rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: #c41e3a;
+      color: #f5f5f5;
+      border: none;
+      padding: 0.45rem 1rem;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      background: #a01830;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-ghost {
+      font-size: 0.75rem;
+      color: #525252;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .btn-ghost:hover {
+      color: #f5f5f5;
+    }
+
+    .empty {
+      font-size: 0.875rem;
+      color: #525252;
+      margin: 0;
+      padding: 1.25rem;
+    }
+
+    .error-msg {
+      font-size: 0.8rem;
+      color: #c41e3a;
+      margin: 0;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+
+  <script>
+    async function loadHackatimeTime(card: HTMLElement) {
+      const project = card.dataset.hackatimeProject;
+      if (!project) return;
+      const timeEl = card.querySelector<HTMLElement>(".hackatime-time");
+      if (!timeEl) return;
+      const id = card.dataset.id ?? "";
+      try {
+        const res = await fetch(
+          `/api/hackatime/project-time?project=${encodeURIComponent(project)}&id=${encodeURIComponent(id)}`,
+        );
+        if (res.status === 403) {
+          timeEl.textContent = "stats private — ask in #raspapi";
+          timeEl.classList.add("error");
+          return;
+        }
+        if (!res.ok) throw new Error();
+        const { total_seconds } = await res.json();
+        timeEl.textContent = formatSeconds(total_seconds);
+      } catch {
+        timeEl.textContent = "";
+      }
+    }
+
+    function formatSeconds(s: number): string {
+      if (!s || s < 60) return "< 1m";
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    document
+      .querySelectorAll<HTMLElement>(".project-card[data-hackatime-project]")
+      .forEach((card) => {
+        if (card.dataset.hackatimeProject) loadHackatimeTime(card);
+      });
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const slackId =
+      document.querySelector<HTMLElement>("[data-slack-id]")?.dataset.slackId;
+    if (slackId) {
+      fetch(`https://cachet.dunkirk.sh/users/${slackId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d) return;
+          const img =
+            document.querySelector<HTMLImageElement>("img[data-slack-id]");
+          if (img && d.imageUrl) {
+            img.src = d.imageUrl;
+            img.style.visibility = "visible";
+          }
+          const name = document.querySelector<HTMLElement>(
+            ".name[data-slack-id]",
+          );
+          if (name && d.displayName) name.textContent = d.displayName;
+        })
+        .catch(() => {});
+    }
+
+    const newBtn = document.getElementById("new-project-btn")!;
+    const newForm = document.getElementById("new-project-form")!;
+    const cancelNew = document.getElementById("cancel-new-btn")!;
+    const nameInput = document.getElementById(
+      "new-project-name",
+    ) as HTMLInputElement;
+    const createBtn = document.getElementById(
+      "create-project-btn",
+    ) as HTMLButtonElement;
+    const newError = document.getElementById("new-project-error")!;
+
+    newBtn.addEventListener("click", () => {
+      newForm.classList.remove("hidden");
+      nameInput.focus();
+    });
+
+    cancelNew.addEventListener("click", () => {
+      newForm.classList.add("hidden");
+      nameInput.value = "";
+      newError.classList.add("hidden");
+    });
+
+    createBtn.addEventListener("click", async () => {
+      const name = nameInput.value.trim();
+      if (!name) return;
+      createBtn.disabled = true;
+      newError.classList.add("hidden");
+      try {
+        const res = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          newError.textContent = data.error ?? "Failed to create project";
+          newError.classList.remove("hidden");
+          return;
+        }
+
+        window.location.reload();
+      } catch {
+        newError.textContent = "Network error";
+        newError.classList.remove("hidden");
+      } finally {
+        createBtn.disabled = false;
+      }
+    });
+
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") createBtn.click();
+    });
+
+    document.querySelectorAll<HTMLButtonElement>(".btn-edit").forEach((btn) => {
+      attachEditBtn(btn);
+    });
+    document
+      .querySelectorAll<HTMLButtonElement>(".cancel-edit-btn")
+      .forEach((btn) => {
+        attachCancelBtn(btn);
+      });
+    document
+      .querySelectorAll<HTMLFormElement>(".project-edit-form")
+      .forEach((form) => {
+        attachEditForm(form);
+      });
+    document
+      .querySelectorAll<HTMLButtonElement>(".btn-delete")
+      .forEach((btn) => {
+        attachDeleteBtn(btn);
+      });
+
+    function attachDeleteBtn(btn: HTMLButtonElement) {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id!;
+        if (!confirm("Delete this project? This cannot be undone.")) return;
+        btn.disabled = true;
+        try {
+          const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            const errorEl = btn
+              .closest("form")
+              ?.querySelector<HTMLElement>(".edit-error");
+            if (errorEl) {
+              errorEl.textContent = data.error ?? "Failed to delete";
+              errorEl.classList.remove("hidden");
+            }
+            btn.disabled = false;
+            return;
+          }
+          const card = document.querySelector<HTMLElement>(
+            `.project-card[data-id="${id}"]`,
+          );
+          card?.remove();
+          if (!document.querySelector(".project-card")) {
+            const list = document.getElementById("projects-list")!;
+            list.innerHTML = `<p class="empty" id="empty-msg">no projects yet</p>`;
+          }
+        } catch {
+          btn.disabled = false;
+        }
+      });
+    }
+
+    function attachEditBtn(btn: HTMLButtonElement) {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id!;
+        const view = document.querySelector<HTMLElement>(
+          `.project-view[data-id="${id}"]`,
+        );
+        const form = document.querySelector<HTMLElement>(
+          `.project-edit-form[data-id="${id}"]`,
+        );
+        view?.classList.add("hidden");
+        form?.classList.remove("hidden");
+        btn.classList.add("hidden");
+        const select =
+          form?.querySelector<HTMLSelectElement>(".hackatime-select");
+        if (select) populateHackatimeSelect(select);
+      });
+    }
+
+    // fetch once per load
+    let hackatimeProjectsCache: string[] | null = null;
+
+    async function populateHackatimeSelect(select: HTMLSelectElement) {
+      if (select.dataset.populated) return;
+      const current = select.dataset.current ?? "";
+
+      select.innerHTML = `<option value="" class="hackatime-loading">loading…</option>`;
+
+      if (!hackatimeProjectsCache) {
+        try {
+          const res = await fetch("/api/hackatime/projects");
+          if (res.status === 400) {
+            select.innerHTML = `<option value="${escAttr(current)}">${current ? escHtml(current) : "-- hackatime not connected --"}</option>`;
+            return;
+          }
+          if (!res.ok) throw new Error();
+          hackatimeProjectsCache = await res.json();
+        } catch {
+          select.innerHTML = `<option value="${escAttr(current)}">${current ? escHtml(current) : "-- failed to load --"}</option>`;
+          return;
+        }
+      }
+
+      const projects = hackatimeProjectsCache!;
+      select.innerHTML = `<option value="">-- none --</option>`;
+      for (const name of projects) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        if (name === current) opt.selected = true;
+        select.appendChild(opt);
+      }
+
+      if (current && !projects.includes(current)) {
+        const opt = document.createElement("option");
+        opt.value = current;
+        opt.textContent = current;
+        opt.selected = true;
+        select.appendChild(opt);
+      }
+      select.dataset.populated = "1";
+    }
+
+    function attachCancelBtn(btn: HTMLButtonElement) {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id!;
+        const view = document.querySelector<HTMLElement>(
+          `.project-view[data-id="${id}"]`,
+        );
+        const form = document.querySelector<HTMLElement>(
+          `.project-edit-form[data-id="${id}"]`,
+        );
+        const editBtn = document.querySelector<HTMLButtonElement>(
+          `.btn-edit[data-id="${id}"]`,
+        );
+        view?.classList.remove("hidden");
+        form?.classList.add("hidden");
+        editBtn?.classList.remove("hidden");
+      });
+    }
+
+    function attachEditForm(form: HTMLFormElement) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = form.dataset.id!;
+        const errorEl = form.querySelector<HTMLElement>(".edit-error")!;
+        const saveBtn = form.querySelector<HTMLButtonElement>(".btn-primary")!;
+        errorEl.classList.add("hidden");
+        saveBtn.disabled = true;
+
+        const fd = new FormData(form);
+        const imageFile = fd.get("image") as File | null;
+
+        const payload: Record<string, string | null> = {};
+        for (const key of [
+          "name",
+          "description",
+          "project_url",
+          "repo_url",
+          "hackatime_project",
+        ] as const) {
+          const val = (fd.get(key) as string | null)?.trim() ?? "";
+          payload[key] = val === "" ? null : val;
+        }
+        if (!payload["name"]) {
+          errorEl.textContent = "Name is required";
+          errorEl.classList.remove("hidden");
+          saveBtn.disabled = false;
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/projects/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            errorEl.textContent = data.error ?? "Failed to save";
+            errorEl.classList.remove("hidden");
+            saveBtn.disabled = false;
+            return;
+          }
+
+          if (imageFile && imageFile.size > 0) {
+            const imgFd = new FormData();
+            imgFd.append("image", imageFile);
+            const imgRes = await fetch(`/api/projects/${id}/image`, {
+              method: "PUT",
+              body: imgFd,
+            });
+            if (!imgRes.ok) {
+              const imgData = await imgRes.json().catch(() => ({}));
+              errorEl.textContent = imgData.error ?? "Image upload failed";
+              errorEl.classList.remove("hidden");
+              saveBtn.disabled = false;
+              return;
+            }
+          }
+
+          updateCardView(id, data);
+
+          const view = document.querySelector<HTMLElement>(
+            `.project-view[data-id="${id}"]`,
+          );
+          const editBtn = document.querySelector<HTMLButtonElement>(
+            `.btn-edit[data-id="${id}"]`,
+          );
+          view?.classList.remove("hidden");
+          form.classList.add("hidden");
+          editBtn?.classList.remove("hidden");
+        } catch {
+          errorEl.textContent = "Network error";
+          errorEl.classList.remove("hidden");
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+    }
+
+    function updateCardView(id: string, data: Record<string, unknown>) {
+      const card = document.querySelector<HTMLElement>(
+        `.project-card[data-id="${id}"]`,
+      );
+      if (!card) return;
+      const nameEl = card.querySelector<HTMLElement>(".project-name");
+      if (nameEl) nameEl.textContent = data.name as string;
+
+      const view = card.querySelector<HTMLElement>(".project-view");
+      if (!view) return;
+      const info =
+        view.querySelector<HTMLElement>(".project-view-info") ?? view;
+
+      let descEl = info.querySelector<HTMLElement>(".project-desc");
+      if (data.description) {
+        if (!descEl) {
+          descEl = document.createElement("p");
+          descEl.className = "project-desc";
+          info.prepend(descEl);
+        }
+        descEl.textContent = data.description as string;
+      } else {
+        descEl?.remove();
+      }
+
+      const linksEl =
+        info.querySelector<HTMLElement>(".project-links") ??
+        (() => {
+          const el = document.createElement("div");
+          el.className = "project-links";
+          info.appendChild(el);
+          return el;
+        })();
+      linksEl.innerHTML = "";
+
+      if (data.project_url) {
+        const a = document.createElement("a");
+        a.href = data.project_url as string;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.className = "project-link";
+        a.textContent = "project ";
+        linksEl.appendChild(a);
+      }
+      if (data.repo_url) {
+        const a = document.createElement("a");
+        a.href = data.repo_url as string;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.className = "project-link";
+        a.textContent = "repo ";
+        linksEl.appendChild(a);
+      }
+      if (data.hackatime_project) {
+        const span = document.createElement("span");
+        span.className = "hackatime-tag";
+        span.textContent = `⏱ ${data.hackatime_project}`;
+        linksEl.appendChild(span);
+
+        const timeEl = document.createElement("span");
+        timeEl.className = "hackatime-time";
+        timeEl.textContent = "…";
+        linksEl.appendChild(timeEl);
+
+        card.dataset.hackatimeProject = data.hackatime_project as string;
+        loadHackatimeTime(card);
+      } else {
+        delete card.dataset.hackatimeProject;
+      }
+    }
+
+    function escHtml(s: string) {
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+    function escAttr(s: string) {
+      return s.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+  </script>
+</Layout>

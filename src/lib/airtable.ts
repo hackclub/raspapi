@@ -23,6 +23,8 @@ export interface ProjectRecord {
 	description: string;
 	hackatime_project?: string;
 	has_pending_submission: boolean;
+	hours_cached?: number;
+	hours_updated_at?: number;
 }
 
 export async function upsertUser(slack_id: string): Promise<UserRecord | null> {
@@ -123,6 +125,8 @@ export async function getProjectById(
 		description: r.fields.description ?? "",
 		hackatime_project: r.fields.hackatime_project ?? undefined,
 		has_pending_submission: r.fields.has_pending_submission ?? false,
+		hours_cached: r.fields.hours_cached ?? undefined,
+		hours_updated_at: r.fields.hours_updated_at ?? undefined,
 	};
 }
 
@@ -146,9 +150,12 @@ export async function getAllProjectsBySlackId(
 				user_slack_id: r.fields.user_slack_id[0],
 				project_url: r.fields.project_url ?? undefined,
 				repo_url: r.fields.repo_url ?? undefined,
+				image_url: r.fields.image?.[0]?.url ?? undefined,
 				description: r.fields.description ?? "",
 				hackatime_project: r.fields.hackatime_project ?? undefined,
 				has_pending_submission: r.fields.has_pending_submission ?? false,
+				hours_cached: r.fields.hours_cached ?? undefined,
+				hours_updated_at: r.fields.hours_updated_at ?? undefined,
 			});
 		}
 		offset = data.offset;
@@ -218,6 +225,29 @@ export async function updateProject(
 		hackatime_project: r.fields.hackatime_project ?? undefined,
 		has_pending_submission: r.fields.has_pending_submission ?? false,
 	};
+}
+
+export async function updateProjectHoursCache(
+	id: string,
+	hours_cached: number,
+	hours_updated_at: number,
+): Promise<boolean> {
+	const res = await fetch(`${BASE()}/projects`, {
+		method: "PATCH",
+		headers: HEADERS(),
+		body: JSON.stringify({
+			records: [{ id, fields: { hours_cached, hours_updated_at } }],
+		}),
+	});
+	return res.ok;
+}
+
+export async function deleteProject(id: string): Promise<boolean> {
+	const res = await fetch(`${BASE()}/projects/${id}`, {
+		method: "DELETE",
+		headers: HEADERS(),
+	});
+	return res.ok;
 }
 
 export async function updateProjectImage(id: string, image: Blob) {
