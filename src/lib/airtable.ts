@@ -25,6 +25,18 @@ export interface ProjectRecord {
 	has_pending_submission: boolean;
 	hours_cached?: number;
 	hours_updated_at?: number;
+	approved_hours: number;
+}
+
+export interface SubmissionRecord {
+	id: string;
+	project_id: string;
+	hours_at_submission: number;
+	review_status: "submitted" | "rejected" | "approved";
+	reviewer_notes: string;
+	multiplier: number;
+	payout: number;
+	payout_transaction_id?: string;
 }
 
 export async function upsertUser(slack_id: string): Promise<UserRecord | null> {
@@ -127,6 +139,7 @@ export async function getProjectById(
 		has_pending_submission: r.fields.has_pending_submission ?? false,
 		hours_cached: r.fields.hours_cached ?? undefined,
 		hours_updated_at: r.fields.hours_updated_at ?? undefined,
+		approved_hours: r.fields.approved_hours ?? 0,
 	};
 }
 
@@ -156,6 +169,7 @@ export async function getAllProjectsBySlackId(
 				has_pending_submission: r.fields.has_pending_submission ?? false,
 				hours_cached: r.fields.hours_cached ?? undefined,
 				hours_updated_at: r.fields.hours_updated_at ?? undefined,
+				approved_hours: r.fields.approved_hours ?? 0,
 			});
 		}
 		offset = data.offset;
@@ -185,6 +199,7 @@ export async function createProject(
 		user_slack_id: r.fields.user_slack_id[0],
 		description: r.fields.description ?? "",
 		has_pending_submission: r.fields.has_pending_submission ?? false,
+		approved_hours: 0,
 	};
 }
 
@@ -224,6 +239,7 @@ export async function updateProject(
 		description: r.fields.description ?? "",
 		hackatime_project: r.fields.hackatime_project ?? undefined,
 		has_pending_submission: r.fields.has_pending_submission ?? false,
+		approved_hours: r.fields.approved_hours ?? 0,
 	};
 }
 
@@ -260,4 +276,33 @@ export async function updateProjectImage(id: string, image: Blob) {
 		body: JSON.stringify({ records: [{ id, fields: { image: [{ url }] } }] }),
 	});
 	return res.ok;
+}
+
+export async function createSubmission(
+	projectId: string,
+	hours: number,
+): Promise<SubmissionRecord | null> {
+	const res = await fetch(`${BASE()}/submissions`, {
+		method: "POST",
+		headers: HEADERS(),
+		body: JSON.stringify({
+			records: [
+				{ fields: { project: [projectId], hours_at_submission: hours } },
+			],
+		}),
+	});
+	if (!res.ok) return null;
+	const created = await res.json();
+	const r = created.records?.[0];
+	if (!r) return null;
+	return {
+		id: r.id,
+		project_id: r.fields.project[0],
+		hours_at_submission: r.fields.hours_at_submission ?? 0,
+		review_status: r.fields.review_status,
+		reviewer_notes: r.fields.reviewer_notes ?? "",
+		multiplier: r.fields.multiplier ?? 1,
+		payout: r.fields.payout ?? 0,
+		payout_transaction_id: r.fields.payout_transaction?.[0] ?? undefined,
+	};
 }
