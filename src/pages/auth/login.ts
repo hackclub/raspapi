@@ -7,6 +7,7 @@ export const GET: APIRoute = async () => {
 		redirect_uri: `${import.meta.env.PUBLIC_BASE_URL}/auth/callback`,
 		scope: "verification_status slack_id",
 	});
+
 	return Response.redirect(
 		`https://auth.hackclub.com/oauth/authorize?${params}`,
 	);

@@ -12,6 +12,8 @@ export interface UserRecord {
 	slack_id: string;
 	hackatime_token?: string;
 	balance: number;
+	row_number?: number;
+	referer?: number;
 }
 
 export interface ProjectRecord {
@@ -40,7 +42,10 @@ export interface SubmissionRecord {
 	payout_transaction_id?: string;
 }
 
-export async function upsertUser(slack_id: string): Promise<UserRecord | null> {
+export async function upsertUser(
+	slack_id: string,
+	referer?: number,
+): Promise<UserRecord | null> {
 	const filter = encodeURIComponent(`{slack_id}="${slack_id}"`);
 	const findRes = await fetch(
 		`${BASE()}/users?filterByFormula=${filter}&maxRecords=1`,
@@ -55,20 +60,31 @@ export async function upsertUser(slack_id: string): Promise<UserRecord | null> {
 				slack_id: r.fields.slack_id,
 				hackatime_token: r.fields.hackatime_token ?? undefined,
 				balance: r.fields.balance ?? 0,
+				row_number: r.fields.row_number ?? undefined,
+				referer: r.fields.referer ?? undefined,
 			};
 		}
 	}
 
+	const fields: Record<string, unknown> = { slack_id };
+	if (referer !== undefined) fields.referer = referer;
+
 	const createRes = await fetch(`${BASE()}/users`, {
 		method: "POST",
 		headers: HEADERS(),
-		body: JSON.stringify({ records: [{ fields: { slack_id } }] }),
+		body: JSON.stringify({ records: [{ fields }] }),
 	});
 	if (!createRes.ok) return null;
 	const created = await createRes.json();
 	const r = created.records?.[0];
 	if (!r) return null;
-	return { id: r.id, slack_id: r.fields.slack_id, balance: 0 };
+	return {
+		id: r.id,
+		slack_id: r.fields.slack_id,
+		balance: 0,
+		row_number: r.fields.row_number ?? undefined,
+		referer: r.fields.referer ?? undefined,
+	};
 }
 
 export async function getUserBySlackId(
@@ -88,6 +104,8 @@ export async function getUserBySlackId(
 		slack_id: r.fields.slack_id,
 		hackatime_token: r.fields.hackatime_token ?? undefined,
 		balance: r.fields.balance ?? 0,
+		row_number: r.fields.row_number ?? undefined,
+		referer: r.fields.referer ?? undefined,
 	};
 }
 
@@ -116,7 +134,11 @@ export async function getAllUsers(): Promise<UserRecord[]> {
 		if (!res.ok) break;
 		const data = await res.json();
 		for (const r of data.records ?? []) {
-			records.push({ id: r.id, slack_id: r.fields.slack_id, balance: r.fields.balance ?? 0 });
+			records.push({
+				id: r.id,
+				slack_id: r.fields.slack_id,
+				balance: r.fields.balance ?? 0,
+			});
 		}
 		offset = data.offset;
 	} while (offset);
@@ -280,7 +302,6 @@ export async function updateProjectImage(id: string, image: Blob) {
 	});
 	return res.ok;
 }
-
 
 export async function createSubmission(
 	projectId: string,

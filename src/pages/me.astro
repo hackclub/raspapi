@@ -83,6 +83,12 @@ try {
           )
         }
         <a href="/auth/logout" class="logout">sign out</a>
+        {userRecord?.row_number && (
+          <button class="referral-copy" id="referral-copy-btn"
+            data-url={`${import.meta.env.PUBLIC_BASE_URL}/?r=${userRecord.row_number}`}>
+            copy referral
+          </button>
+        )}
       </div>
     </header>
 
@@ -190,6 +196,21 @@ try {
     .hackatime-status {
       font-size: 0.75rem;
       color: #525252;
+    }
+
+    .referral-copy {
+      font-size: 0.75rem;
+      color: #525252;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .referral-copy.copied {
+      color: #f5f5f5;
     }
 
     .shop {
@@ -341,6 +362,20 @@ try {
   </style>
 
   <script>
+    const copyBtn = document.getElementById("referral-copy-btn") as HTMLButtonElement | null;
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(copyBtn.dataset.url ?? "").then(() => {
+          copyBtn.textContent = "copied!";
+          copyBtn.classList.add("copied");
+          setTimeout(() => {
+            copyBtn.textContent = "copy referral";
+            copyBtn.classList.remove("copied");
+          }, 1500);
+        });
+      });
+    }
+
     const id =
       document.querySelector<HTMLElement>("[data-slack-id]")?.dataset.slackId;
     if (id) {
