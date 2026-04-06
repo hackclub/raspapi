@@ -3,17 +3,7 @@ import type { APIRoute } from "astro";
 export const WIDTH = 32;
 export const HEIGHT = 32;
 
-export const ALLOWED_COLORS = new Set([
-	"#0a0a0a",
-	"#c41e3a",
-	"#e5e5e5",
-	"#404040",
-	"#3b82f6",
-	"#22c55e",
-	"#eab308",
-	"#a855f7",
-	"#f97316",
-]);
+
 
 const canvas: string[] = Array(WIDTH * HEIGHT).fill("#0a0a0a");
 
@@ -87,8 +77,7 @@ export const POST: APIRoute = async ({ request }) => {
 		x < 0 ||
 		x >= WIDTH ||
 		y < 0 ||
-		y >= HEIGHT ||
-		!ALLOWED_COLORS.has(color)
+		y >= HEIGHT
 	) {
 		return new Response(JSON.stringify({ error: "Invalid request" }), {
 			status: 400,

@@ -423,6 +423,34 @@ const pastProjects = [
       outline-offset: 1px;
     }
 
+    :global(.swatch.add-btn) {
+      position: relative;
+      background: #111;
+      color: #737373;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed #404040;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    :global(.picker-input) {
+      position: absolute;
+      inset: -1px;
+      width: calc(100% + 2px);
+      height: calc(100% + 2px);
+      opacity: 0;
+      cursor: pointer;
+      padding: 0;
+      border: none;
+    }
+
+    :global(.swatch.add-btn:hover) {
+      color: #fff;
+      border-color: #c41e3a;
+      background: rgba(196, 30, 58, 0.15);
+    }
+
     .curl-example {
       font-family: monospace;
       font-size: 0.75rem;
@@ -600,6 +628,31 @@ const pastProjects = [
     });
     palette.appendChild(swatch);
   }
+
+  const addBtn = document.createElement("div");
+  addBtn.className = "swatch add-btn";
+  addBtn.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  `;
+  addBtn.title = "custom color";
+  palette.appendChild(addBtn);
+
+  const picker = document.createElement("input");
+  picker.type = "color";
+  picker.className = "picker-input";
+  addBtn.appendChild(picker);
+
+  picker.oninput = () => {
+    selectedColor = picker.value;
+    document
+      .querySelectorAll(".swatch")
+      .forEach((s) => s.classList.remove("active"));
+    updateCurl(selectedCell?.x ?? null, selectedCell?.y ?? null);
+    render();
+  };
 
   function render() {
     for (let y = 0; y < HEIGHT; y++) {
