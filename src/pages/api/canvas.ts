@@ -3,12 +3,14 @@ import type { APIRoute } from "astro";
 export const WIDTH = 32;
 export const HEIGHT = 32;
 
-
-
 const canvas: string[] = Array(WIDTH * HEIGHT).fill("#0a0a0a");
 
 // ip -> timestamp
 const rateLimitMap = new Map<string, number>();
+
+function isValidColor(color: string): boolean {
+	return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color);
+}
 
 function getClientIp(request: Request): string {
 	return (
@@ -77,7 +79,8 @@ export const POST: APIRoute = async ({ request }) => {
 		x < 0 ||
 		x >= WIDTH ||
 		y < 0 ||
-		y >= HEIGHT
+		y >= HEIGHT ||
+		!isValidColor(color)
 	) {
 		return new Response(JSON.stringify({ error: "Invalid request" }), {
 			status: 400,
