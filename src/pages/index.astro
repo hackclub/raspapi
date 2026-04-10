@@ -19,6 +19,18 @@ const pastProjects = [
 		link: "https://github.com/duykhanh09103/ytdlp-web-api",
 	},
 ];
+
+const COLORS = [
+	"#0a0a0a",
+	"#c41e3a",
+	"#e5e5e5",
+	"#404040",
+	"#3b82f6",
+	"#22c55e",
+	"#eab308",
+	"#a855f7",
+	"#f97316",
+];
 ---
 
 <Layout>
@@ -120,7 +132,34 @@ const pastProjects = [
 
     <section class="info-section canvas-section">
       <canvas id="pixel-canvas"></canvas>
-      <div class="palette" id="palette"></div>
+      <div class="palette" id="palette">
+        {
+          COLORS.map((color) => (
+            <div
+              class="swatch"
+              style={{ background: color }}
+              data-color={color}
+              title={color === "#0a0a0a" ? "erase" : color}
+            />
+          ))
+        }
+        <div class="swatch add-btn" title="custom color">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <input type="color" class="picker-input" />
+        </div>
+      </div>
       <pre class="curl-example" id="curl-example"></pre>
     </section>
   </main>
@@ -406,7 +445,7 @@ const pastProjects = [
       justify-content: center;
     }
 
-    :global(.swatch) {
+    .swatch {
       width: 20px;
       height: 20px;
       border: 1px solid #262626;
@@ -414,13 +453,42 @@ const pastProjects = [
       transition: outline 0.1s;
     }
 
-    :global(.swatch[data-color="#0a0a0a"]) {
+    .swatch[data-color="#0a0a0a"] {
       border-color: #404040;
     }
 
-    :global(.swatch.active) {
+    .swatch.active {
       outline: 2px solid #e5e5e5;
       outline-offset: 1px;
+    }
+
+    .swatch.add-btn {
+      position: relative;
+      background: var(--custom-color, #111);
+      color: #737373;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed #404040;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .picker-input {
+      position: absolute;
+      inset: -1px;
+      width: calc(100% + 2px);
+      height: calc(100% + 2px);
+      opacity: 0;
+      cursor: pointer;
+      padding: 0;
+      border: none;
+    }
+
+    .swatch.add-btn:hover {
+      color: #fff;
+      border-color: #e5e5e5;
+      background: var(--custom-color, rgba(255, 255, 255, 0.15));
+      filter: brightness(1.2);
     }
 
     .curl-example {
@@ -538,17 +606,6 @@ const pastProjects = [
   const HEIGHT = 32;
   const POLL_MS = 3000;
 
-  const COLORS = [
-    "#0a0a0a",
-    "#c41e3a",
-    "#e5e5e5",
-    "#404040",
-    "#3b82f6",
-    "#22c55e",
-    "#eab308",
-    "#a855f7",
-    "#f97316",
-  ];
 
   const canvas = document.getElementById("pixel-canvas") as HTMLCanvasElement;
   if (!canvas) throw new Error("canvas not found");
@@ -582,13 +639,11 @@ const pastProjects = [
     curlEl.textContent = curlCommand(x, y);
   }
 
-  const palette = document.getElementById("palette")!;
-  for (const color of COLORS) {
-    const swatch = document.createElement("div");
-    swatch.className = "swatch" + (color === selectedColor ? " active" : "");
-    swatch.style.background = color;
-    swatch.dataset.color = color;
-    swatch.title = color === "#0a0a0a" ? "erase" : color;
+  const swatches = document.querySelectorAll(".swatch:not(.add-btn)");
+  swatches.forEach((swatch) => {
+    const color = (swatch as HTMLElement).dataset.color!;
+    if (color === selectedColor) swatch.classList.add("active");
+
     swatch.addEventListener("click", () => {
       selectedColor = color;
       document
@@ -598,8 +653,23 @@ const pastProjects = [
       render();
       updateCurl(selectedCell?.x ?? null, selectedCell?.y ?? null);
     });
-    palette.appendChild(swatch);
-  }
+  });
+
+  const picker = document.querySelector(".picker-input") as HTMLInputElement;
+  picker.oninput = () => {
+    selectedColor = picker.value;
+
+    const addBtn = picker.parentElement as HTMLElement;
+    addBtn.style.setProperty("--custom-color", selectedColor);
+    addBtn.style.borderStyle = "solid";
+    addBtn.style.borderColor = "rgba(255,255,255,0.1)";
+
+    document
+      .querySelectorAll(".swatch")
+      .forEach((s) => s.classList.remove("active"));
+    updateCurl(selectedCell?.x ?? null, selectedCell?.y ?? null);
+    render();
+  };
 
   function render() {
     for (let y = 0; y < HEIGHT; y++) {
