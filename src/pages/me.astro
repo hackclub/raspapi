@@ -68,9 +68,14 @@ try {
         <a href="/projects" class="logout"> my projects </a>
         {
           isAdmin && (
-            <a href="/admin/users" class="logout">
-              admin
-            </a>
+            <>
+              <a href="/review" class="logout">
+                review
+              </a>
+              <a href="/admin/users" class="logout">
+                admin
+              </a>
+            </>
           )
         }
         {

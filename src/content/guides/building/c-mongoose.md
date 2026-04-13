@@ -130,8 +130,8 @@ However, real APIs usually have multiple endpoints and different request types l
 
 The parsed HTTP request stored in struct mg_http_message contains two important fields:
 
-- `hm->uri` — the request path (for example /api/hello)
-- `hm->method` — the HTTP method (GET, POST, etc.)
+- `hm->uri` - the request path (for example /api/hello)
+- `hm->method` - the HTTP method (GET, POST, etc.)
 
 You can use these to create multiple endpoints. You need at least 3 GET endpoints and 1 POST endpoint to submit your project.
 

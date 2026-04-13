@@ -108,13 +108,30 @@ const projects = await getAllProjectsBySlackId(session.slack_id);
                         <span class="hackatime-time">…</span>
                       )}
                     </div>
-                    <button
-                      class="btn-ship"
-                      disabled
-                      title="Submission coming soon"
-                    >
-                      ship
-                    </button>
+                    {!project.has_pending_submission &&
+                    project.hackatime_project &&
+                    project.name &&
+                    project.description &&
+                    project.image_url &&
+                    project.project_url &&
+                    project.repo_url ? (
+                      <button
+                        class="btn-ship btn-ship--ready"
+                        data-id={project.id}
+                      >
+                        ship
+                      </button>
+                    ) : project.has_pending_submission ? (
+                      <span class="ship-status">submitted for review</span>
+                    ) : (
+                      <button
+                        class="btn-ship"
+                        disabled
+                        title="Fill all fields and link hackatime to ship"
+                      >
+                        ship
+                      </button>
+                    )}
                   </div>
                   {project.image_url && (
                     <img
@@ -216,6 +233,81 @@ const projects = await getAllProjectsBySlackId(session.slack_id);
       </div>
     </section>
   </main>
+
+  <!-- Ship confirm -->
+  <div id="ship-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Ready to ship?</h2>
+        <button class="modal-close" id="ship-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-intro">
+          Check off each requirement before submitting. You won't be able to
+          edit the project until it's reviewed.
+        </p>
+        <ul class="checklist">
+          <li class="checklist-item">
+            <label>
+              <input type="checkbox" class="ship-check" />
+              <span
+                >My API is publicly accessible at a stable URL (no ngrok free
+                tier or other ephemeral links)</span
+              >
+            </label>
+          </li>
+          <li class="checklist-item">
+            <label>
+              <input type="checkbox" class="ship-check" />
+              <span
+                >My API has at least 3 GET endpoints and 1 POST endpoint (or
+                something of similar complexity)</span
+              >
+            </label>
+          </li>
+          <li class="checklist-item">
+            <label>
+              <input type="checkbox" class="ship-check" />
+              <span
+                >My API has docs at <code>/docs</code> explaining every endpoint with
+                example requests</span
+              >
+            </label>
+          </li>
+          <li class="checklist-item">
+            <label>
+              <input type="checkbox" class="ship-check" />
+              <span
+                >Anyone can use my API - if it needs auth, there's a way to
+                easily get access (e.g. demo key in the docs)</span
+              >
+            </label>
+          </li>
+          <li class="checklist-item">
+            <label>
+              <input type="checkbox" class="ship-check" />
+              <span
+                >My code is in a public git repo with a hand-written README</span
+              >
+            </label>
+          </li>
+        </ul>
+        <p class="modal-buffs-note">
+          Reviewers award multipliers based on what your API implements.
+          <a href="/guides/buffs" target="_blank" rel="noopener noreferrer"
+            >Read the buffs guide</a
+          > to see what earns a higher payout.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="ship-modal-cancel">cancel</button>
+        <button class="btn-primary" id="ship-modal-confirm" disabled
+          >ship it</button
+        >
+      </div>
+    </div>
+  </div>
 
   <style is:global>
     .page {
@@ -411,6 +503,28 @@ const projects = await getAllProjectsBySlackId(session.slack_id);
       cursor: not-allowed;
     }
 
+    .btn-ship--ready {
+      border-color: #c41e3a;
+      color: #c41e3a;
+      cursor: pointer;
+    }
+
+    .btn-ship--ready:hover {
+      background: #c41e3a;
+      color: #f5f5f5;
+    }
+
+    .btn-ship--ready:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .ship-status {
+      font-size: 0.75rem;
+      color: #525252;
+      font-style: italic;
+    }
+
     .btn-delete {
       font-size: 0.75rem;
       color: #525252;
@@ -590,6 +704,139 @@ const projects = await getAllProjectsBySlackId(session.slack_id);
     .hidden {
       display: none !important;
     }
+
+    /* Ship modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-content {
+      position: relative;
+      background: #111;
+      border: 1px solid #262626;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .modal-title {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: #f5f5f5;
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #525252;
+      font-size: 1.25rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .modal-close:hover {
+      color: #f5f5f5;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .modal-intro {
+      font-size: 0.8rem;
+      color: #737373;
+      margin: 0;
+    }
+
+    .checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .checklist-item label {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      cursor: pointer;
+    }
+
+    .checklist-item input[type="checkbox"] {
+      margin-top: 0.15rem;
+      flex-shrink: 0;
+      accent-color: #c41e3a;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    .checklist-item span {
+      font-size: 0.825rem;
+      color: #a3a3a3;
+      line-height: 1.5;
+    }
+
+    .checklist-item code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.75rem;
+      background: #1a1a1a;
+      padding: 0.1rem 0.3rem;
+      color: #e5e5e5;
+    }
+
+    .modal-buffs-note {
+      font-size: 0.775rem;
+      color: #525252;
+      margin: 0;
+      padding-top: 0.75rem;
+      border-top: 1px solid #1a1a1a;
+    }
+
+    .modal-buffs-note a {
+      color: #c41e3a;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid #1a1a1a;
+    }
   </style>
 
   <script>
@@ -603,7 +850,7 @@ const projects = await getAllProjectsBySlackId(session.slack_id);
           `/api/hackatime/project-time?id=${encodeURIComponent(id)}`,
         );
         if (res.status === 403) {
-          timeEl.textContent = "stats private — ask in #raspapi";
+          timeEl.textContent = "stats private - ask in #raspapi";
           timeEl.classList.add("error");
           return;
         }
@@ -997,5 +1244,99 @@ const projects = await getAllProjectsBySlackId(session.slack_id);
     function escAttr(s: string) {
       return s.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
+
+    const shipModal = document.getElementById("ship-modal")!;
+    const shipModalBackdrop = shipModal.querySelector(".modal-backdrop")!;
+    const shipModalClose = document.getElementById("ship-modal-close")!;
+    const shipModalCancel = document.getElementById("ship-modal-cancel")!;
+    const shipModalConfirm = document.getElementById(
+      "ship-modal-confirm",
+    ) as HTMLButtonElement;
+    const shipChecks =
+      shipModal.querySelectorAll<HTMLInputElement>(".ship-check");
+
+    let pendingShipId: string | null = null;
+    let pendingShipBtn: HTMLButtonElement | null = null;
+
+    function openShipModal(id: string, btn: HTMLButtonElement) {
+      pendingShipId = id;
+      pendingShipBtn = btn;
+      shipChecks.forEach((c) => (c.checked = false));
+      shipModalConfirm.disabled = true;
+      shipModal.classList.remove("hidden");
+    }
+
+    function closeShipModal() {
+      shipModal.classList.add("hidden");
+      pendingShipId = null;
+      pendingShipBtn = null;
+    }
+
+    shipChecks.forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        shipModalConfirm.disabled = !Array.from(shipChecks).every(
+          (c) => c.checked,
+        );
+      });
+    });
+
+    shipModalClose.addEventListener("click", closeShipModal);
+    shipModalCancel.addEventListener("click", closeShipModal);
+    shipModalBackdrop.addEventListener("click", closeShipModal);
+
+    shipModalConfirm.addEventListener("click", async () => {
+      const id = pendingShipId;
+      const btn = pendingShipBtn;
+      if (!id || !btn) return;
+
+      closeShipModal();
+      btn.disabled = true;
+      btn.textContent = "submitting...";
+
+      try {
+        const res = await fetch(`/api/projects/${id}/submit`, {
+          method: "POST",
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error ?? "Failed to submit");
+          btn.disabled = false;
+          btn.textContent = "ship";
+          return;
+        }
+
+        const statusSpan = document.createElement("span");
+        statusSpan.className = "ship-status";
+        statusSpan.textContent = "submitted for review";
+        btn.replaceWith(statusSpan);
+
+        const card = document.querySelector<HTMLElement>(
+          `.project-card[data-id="${id}"]`,
+        );
+        const titleRow = card?.querySelector(".project-title-row");
+        if (titleRow && !titleRow.querySelector(".badge")) {
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = "pending";
+          titleRow.appendChild(badge);
+        }
+      } catch {
+        alert("Network error");
+        btn.disabled = false;
+        btn.textContent = "ship";
+      }
+    });
+
+    // ship button handler
+    document
+      .querySelectorAll<HTMLButtonElement>(".btn-ship--ready")
+      .forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          if (!id) return;
+          openShipModal(id, btn);
+        });
+      });
   </script>
 </Layout>

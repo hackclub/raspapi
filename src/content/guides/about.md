@@ -20,5 +20,6 @@ Before submitting your project, make sure you meet the following requirements:
 - Your API should include docs at `/docs`. These can be handwritten or auto-generated (Swagger, Redoc, Scalar, etc.), but should clearly explain your endpoints and give an example of a valid request for each.
 - Your API should be usable by anyone. If it requires auth or API keys, make sure there's a way for people to easily get access, such as with a demo key on your docs.
 - Your code should be in a public git repo with a (hand-written, please) README explaining what it is.
-- You should have around 5–7 hours tracked on Hackatime.
 - Make something cool and have fun!
+
+Reviewers award a multiplier based on what your API implements - see the [Buffs & Multipliers](/guides/buffs) guide for details on how payouts are calculated.

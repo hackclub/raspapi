@@ -14,7 +14,7 @@ const guides = await getCollection("guides");
 const grouped = guides.reduce(
 	(acc, guide) => {
 		const parts = guide.id.split("/");
-		const category = parts.length > 1 ? parts[0] : "general";
+		const category = parts.length > 1 ? parts[0] : "about";
 		if (!acc[category]) acc[category] = [];
 		acc[category].push(guide);
 		return acc;

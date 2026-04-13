@@ -39,7 +39,7 @@ const COLORS = [
 
     <img
       src="/rpizero-topdown.png"
-      alt="Raspberry Pi Zero 2W — top-down view"
+      alt="Raspberry Pi Zero 2W - top-down view"
       class="pi-image pointer-events-none select-none"
       draggable="false"
     />
@@ -102,9 +102,11 @@ const COLORS = [
           demo key in your docs)
         </li>
         <li>Public git repo with a hand-written README</li>
-        <li>Around <strong>5&ndash;7 hours</strong> tracked on Hackatime</li>
         <li>Make something cool and have fun!</li>
       </ul>
+      <p style="margin-top:1.25rem;font-size:0.875rem;color:#737373;line-height:1.6;">
+        Reviewers award a multiplier based on what your API implements. <a href="/guides/buffs" style="color:#c41e3a;text-decoration:underline;text-underline-offset:3px;">See how payouts are calculated.</a>
+      </p>
 
       <section class="info-section">
         <h2 class="section-heading">EXAMPLES</h2>
@@ -625,8 +627,8 @@ const COLORS = [
   let hoverCell: { x: number; y: number } | null = null;
 
   function curlCommand(x: number | null, y: number | null): string {
-    const xStr = x !== null ? String(x) : "—";
-    const yStr = y !== null ? String(y) : "—";
+    const xStr = x !== null ? String(x) : "-";
+    const yStr = y !== null ? String(y) : "-";
     const url = `${window.location.origin}/api/canvas`;
     return (
       `$ curl -X POST ${url} \\\n` +

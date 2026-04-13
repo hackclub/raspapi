@@ -1,0 +1,1031 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getSession } from "../lib/session";
+import { getPendingSubmissions } from "../lib/airtable";
+
+const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
+if (!session) return Astro.redirect("/auth/login");
+
+const adminIds = (import.meta.env.ADMIN_IDS ?? "")
+	.split(",")
+	.map((s: string) => s.trim())
+	.filter(Boolean);
+if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
+
+const submissions = await getPendingSubmissions();
+---
+
+<Layout>
+  <main class="page">
+    <header class="topbar">
+      <span class="label">REVIEW QUEUE</span>
+      <div class="actions">
+        <span class="count">{submissions.length} pending</span>
+        <a href="/me" class="back">dashboard</a>
+      </div>
+    </header>
+
+    <section class="content">
+      {
+        submissions.length === 0 ? (
+          <p class="empty">No submissions to review</p>
+        ) : (
+          <div class="submissions-list">
+            {submissions.map((sub) => (
+              <div
+                class="submission-card"
+                data-id={sub.id}
+                data-project-id={sub.project_id}
+                data-hours={sub.hours_at_submission}
+                data-user-slack-id={sub.user_slack_id}
+                data-project-name={sub.project_name}
+                data-project-url={sub.project_url ?? ""}
+                data-repo-url={sub.repo_url ?? ""}
+              >
+                <div class="submission-header">
+                  <div class="submission-info">
+                    <h2 class="project-name">{sub.project_name}</h2>
+                    <p class="submitter" data-slack-id={sub.user_slack_id}>
+                      by <span class="submitter-name">{sub.user_slack_id}</span>
+                    </p>
+                  </div>
+                  <div class="submission-meta">
+                    <span class="hours">
+                      {sub.hours_at_submission.toFixed(2)}h
+                    </span>
+                    <span class="date">
+                      {new Date(sub.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="submission-details">
+                  {sub.project_description && (
+                    <p class="description">{sub.project_description}</p>
+                  )}
+                  <div class="links">
+                    {sub.project_url && (
+                      <a
+                        href={sub.project_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link"
+                      >
+                        project
+                      </a>
+                    )}
+                    {sub.repo_url && (
+                      <a
+                        href={sub.repo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link"
+                      >
+                        repo
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <button class="btn-review" data-id={sub.id}>
+                  Review
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </section>
+
+    <!-- Review Modal -->
+    <div id="review-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Review Submission</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="review-project-info">
+            <h3 id="review-project-name"></h3>
+            <p id="review-submitter"></p>
+            <p id="review-hours"></p>
+            <div class="review-links">
+              <a
+                id="review-project-link"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link hidden">project</a
+              >
+              <a
+                id="review-repo-link"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link hidden">repo</a
+              >
+            </div>
+          </div>
+
+          <div class="buff-section">
+            <h4>Buff Checklist</h4>
+            <p class="buff-hint">
+              M starts at 1.0. Flat bonuses cap at 1.5 before multipliers.
+            </p>
+
+            <div class="buff-group">
+              <span class="buff-group-label">Flat Bonuses (additive)</span>
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="buff"
+                  value="auth"
+                  data-value="0.15"
+                />
+                <span>Authorization (JWT, user tokens, API keys): +0.15</span>
+              </label>
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="buff"
+                  value="persistence"
+                  data-value="0.10"
+                />
+                <span>Persistence (database, file storage): +0.10</span>
+              </label>
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="buff"
+                  value="external_api"
+                  data-value="0.10"
+                />
+                <span>Integrates with external API (non-trivial): +0.10</span>
+              </label>
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="buff"
+                  value="rate_limiting"
+                  data-value="0.10"
+                />
+                <span>Rate limiting / abuse prevention: +0.10</span>
+              </label>
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="buff"
+                  value="pagination"
+                  data-value="0.05"
+                />
+                <span>Pagination: +0.05</span>
+              </label>
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="buff"
+                  value="error_handling"
+                  data-value="0.05"
+                />
+                <span>Proper error handling & input validation: +0.05</span>
+              </label>
+              <div class="buff-item endpoints-item">
+                <label>
+                  <span>Additional endpoints (max 4): +0.03 each</span>
+                </label>
+                <div class="endpoints-counter">
+                  <button type="button" class="endpoint-btn" id="endpoints-dec"
+                    >-</button
+                  >
+                  <span id="endpoints-count">0</span>
+                  <button type="button" class="endpoint-btn" id="endpoints-inc"
+                    >+</button
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="buff-group">
+              <span class="buff-group-label"
+                >Multipliers (applied after flat cap)</span
+              >
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="multiplier"
+                  value="cool_project"
+                  data-value="1.3"
+                />
+                <span>Cool project: x1.3</span>
+              </label>
+              <label class="buff-item">
+                <input
+                  type="checkbox"
+                  name="multiplier"
+                  value="exceptional_quality"
+                  data-value="1.2"
+                />
+                <span>Exceptional code quality / architecture: x1.2</span>
+              </label>
+            </div>
+
+            <div class="multiplier-display">
+              <div class="multiplier-breakdown" id="multiplier-breakdown">
+                <span>Base: 1.0</span>
+              </div>
+              <div class="multiplier-result">
+                <span>Final M:</span>
+                <span id="final-multiplier" class="multiplier-value">1.00</span>
+              </div>
+              <div class="payout-preview">
+                <span>Payout:</span>
+                <span id="payout-preview" class="payout-value">0</span>
+                <span class="payout-unit">raspberries</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="notes-section">
+            <label for="reviewer-notes">Reviewer Notes</label>
+            <textarea
+              id="reviewer-notes"
+              rows="3"
+              placeholder="Optional notes about this submission..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-reject" id="btn-reject">Reject</button>
+          <button class="btn-approve" id="btn-approve">Approve</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <style>
+    .page {
+      min-height: 100vh;
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 7rem;
+    }
+
+    .label {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      color: #c41e3a;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .count {
+      font-size: 0.8rem;
+      color: #525252;
+    }
+
+    .back {
+      font-size: 0.75rem;
+      color: #525252;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .empty {
+      font-size: 0.875rem;
+      color: #525252;
+      margin: 0;
+    }
+
+    .submissions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      border: 1px solid #262626;
+    }
+
+    .submission-card {
+      padding: 1.25rem;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .submission-card:last-child {
+      border-bottom: none;
+    }
+
+    .submission-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .submission-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .project-name {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #f5f5f5;
+      margin: 0;
+    }
+
+    .submitter {
+      font-size: 0.8rem;
+      color: #525252;
+      margin: 0;
+    }
+
+    .submitter-name {
+      color: #737373;
+    }
+
+    .submission-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.25rem;
+    }
+
+    .hours {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #c41e3a;
+    }
+
+    .date {
+      font-size: 0.75rem;
+      color: #525252;
+    }
+
+    .submission-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .description {
+      font-size: 0.85rem;
+      color: #737373;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .links {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .link {
+      font-size: 0.75rem;
+      color: #525252;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .link:hover {
+      color: #f5f5f5;
+    }
+
+    .btn-review {
+      align-self: flex-start;
+      font-size: 0.75rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: 1px solid #c41e3a;
+      color: #c41e3a;
+      padding: 0.3rem 0.85rem;
+      cursor: pointer;
+    }
+
+    .btn-review:hover {
+      background: #c41e3a;
+      color: #f5f5f5;
+    }
+
+    /* Modal styles */
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+    }
+
+    .modal-content {
+      position: relative;
+      background: #0a0a0a;
+      border: 1px solid #262626;
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #262626;
+    }
+
+    .modal-title {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #f5f5f5;
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #525252;
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: #f5f5f5;
+    }
+
+    .modal-body {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .review-project-info h3 {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #f5f5f5;
+      margin: 0 0 0.5rem 0;
+    }
+
+    .review-project-info p {
+      font-size: 0.85rem;
+      color: #737373;
+      margin: 0 0 0.25rem 0;
+    }
+
+    .review-links {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .buff-section h4 {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #f5f5f5;
+      margin: 0 0 0.25rem 0;
+    }
+
+    .buff-hint {
+      font-size: 0.75rem;
+      color: #525252;
+      margin: 0 0 1rem 0;
+    }
+
+    .buff-group {
+      margin-bottom: 1rem;
+    }
+
+    .buff-group-label {
+      display: block;
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #525252;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .buff-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      cursor: pointer;
+    }
+
+    .buff-item input[type="checkbox"] {
+      accent-color: #c41e3a;
+    }
+
+    .buff-item span {
+      font-size: 0.85rem;
+      color: #a3a3a3;
+    }
+
+    .endpoints-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .endpoints-counter {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-left: 1.5rem;
+    }
+
+    .endpoint-btn {
+      width: 24px;
+      height: 24px;
+      background: #1a1a1a;
+      border: 1px solid #262626;
+      color: #f5f5f5;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .endpoint-btn:hover {
+      background: #262626;
+    }
+
+    #endpoints-count {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #f5f5f5;
+      min-width: 1.5rem;
+      text-align: center;
+    }
+
+    .multiplier-display {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #111;
+      border: 1px solid #262626;
+    }
+
+    .multiplier-breakdown {
+      font-size: 0.8rem;
+      color: #525252;
+      margin-bottom: 0.75rem;
+      line-height: 1.6;
+    }
+
+    .multiplier-result {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+    }
+
+    .multiplier-result span:first-child {
+      font-size: 0.85rem;
+      color: #737373;
+    }
+
+    .multiplier-value {
+      font-size: 1.25rem;
+      color: #c41e3a;
+    }
+
+    .payout-preview {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      font-family: "Syne", sans-serif;
+    }
+
+    .payout-preview span:first-child {
+      font-size: 0.85rem;
+      color: #737373;
+      font-weight: 700;
+    }
+
+    .payout-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #22c55e;
+    }
+
+    .payout-unit {
+      font-size: 0.8rem;
+      color: #525252;
+    }
+
+    .notes-section label {
+      display: block;
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #525252;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .notes-section textarea {
+      width: 100%;
+      background: #111;
+      border: 1px solid #262626;
+      color: #f5f5f5;
+      font-family: "Inter", sans-serif;
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      resize: vertical;
+      min-height: 72px;
+      box-sizing: border-box;
+    }
+
+    .notes-section textarea:focus {
+      border-color: #404040;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      border-top: 1px solid #262626;
+    }
+
+    .btn-reject,
+    .btn-approve {
+      font-size: 0.8rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      padding: 0.5rem 1.25rem;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-reject {
+      background: #1a1a1a;
+      color: #c41e3a;
+      border: 1px solid #c41e3a;
+    }
+
+    .btn-reject:hover {
+      background: #c41e3a;
+      color: #f5f5f5;
+    }
+
+    .btn-approve {
+      background: #22c55e;
+      color: #0a0a0a;
+    }
+
+    .btn-approve:hover {
+      background: #16a34a;
+    }
+
+    .btn-reject:disabled,
+    .btn-approve:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+
+  <script>
+    document.querySelectorAll<HTMLElement>(".submitter").forEach(async (el) => {
+      const slackId = el.dataset.slackId;
+      if (!slackId) return;
+      try {
+        const res = await fetch(`https://cachet.dunkirk.sh/users/${slackId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const nameEl = el.querySelector(".submitter-name");
+        if (nameEl && data.displayName) {
+          nameEl.textContent = data.displayName;
+        }
+      } catch {}
+    });
+
+    const modal = document.getElementById("review-modal")!;
+    const backdrop = modal.querySelector(".modal-backdrop")!;
+    const closeBtn = modal.querySelector(".modal-close")!;
+    const approveBtn = document.getElementById(
+      "btn-approve",
+    ) as HTMLButtonElement;
+    const rejectBtn = document.getElementById(
+      "btn-reject",
+    ) as HTMLButtonElement;
+    const notesInput = document.getElementById(
+      "reviewer-notes",
+    ) as HTMLTextAreaElement;
+
+    let currentSubmissionId: string | null = null;
+    let currentHours = 0;
+    let endpointsCount = 0;
+
+    function closeModal() {
+      modal.classList.add("hidden");
+      currentSubmissionId = null;
+      resetBuffs();
+    }
+
+    backdrop.addEventListener("click", closeModal);
+    closeBtn.addEventListener("click", closeModal);
+
+    document
+      .querySelectorAll<HTMLButtonElement>(".btn-review")
+      .forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const card = btn.closest(".submission-card") as HTMLElement;
+          if (!card) return;
+
+          currentSubmissionId = card.dataset.id!;
+          currentHours = parseFloat(card.dataset.hours || "0");
+
+          const projectName = card.dataset.projectName || "";
+          const projectUrl = card.dataset.projectUrl || "";
+          const repoUrl = card.dataset.repoUrl || "";
+          const userSlackId = card.dataset.userSlackId || "";
+
+          document.getElementById("review-project-name")!.textContent =
+            projectName;
+          document.getElementById("review-submitter")!.textContent =
+            `Submitter: ${userSlackId}`;
+          document.getElementById("review-hours")!.textContent =
+            `Hours: ${currentHours.toFixed(2)}h`;
+
+          const projectLink = document.getElementById(
+            "review-project-link",
+          ) as HTMLAnchorElement;
+          const repoLink = document.getElementById(
+            "review-repo-link",
+          ) as HTMLAnchorElement;
+
+          if (projectUrl) {
+            projectLink.href = projectUrl;
+            projectLink.classList.remove("hidden");
+          } else {
+            projectLink.classList.add("hidden");
+          }
+
+          if (repoUrl) {
+            repoLink.href = repoUrl;
+            repoLink.classList.remove("hidden");
+          } else {
+            repoLink.classList.add("hidden");
+          }
+
+          fetch(`https://cachet.dunkirk.sh/users/${userSlackId}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (d?.displayName) {
+                document.getElementById("review-submitter")!.textContent =
+                  `Submitter: ${d.displayName}`;
+              }
+            })
+            .catch(() => {});
+
+          resetBuffs();
+          modal.classList.remove("hidden");
+        });
+      });
+
+    function resetBuffs() {
+      document
+        .querySelectorAll<HTMLInputElement>('input[name="buff"]')
+        .forEach((cb) => {
+          cb.checked = false;
+        });
+      document
+        .querySelectorAll<HTMLInputElement>('input[name="multiplier"]')
+        .forEach((cb) => {
+          cb.checked = false;
+        });
+      endpointsCount = 0;
+      document.getElementById("endpoints-count")!.textContent = "0";
+      notesInput.value = "";
+      updateMultiplier();
+    }
+
+    function updateMultiplier() {
+      let flatSum = 0;
+      const breakdown: string[] = ["Base: 1.0"];
+
+      document
+        .querySelectorAll<HTMLInputElement>('input[name="buff"]:checked')
+        .forEach((cb) => {
+          const val = parseFloat(cb.dataset.value || "0");
+          flatSum += val;
+          const label =
+            cb.parentElement
+              ?.querySelector("span")
+              ?.textContent?.split(":")[0] || "";
+          breakdown.push(`${label}: +${val.toFixed(2)}`);
+        });
+
+      if (endpointsCount > 0) {
+        const endpointsBonus = endpointsCount * 0.03;
+        flatSum += endpointsBonus;
+        breakdown.push(
+          `Additional endpoints (${endpointsCount}): +${endpointsBonus.toFixed(2)}`,
+        );
+      }
+
+      const flatM = Math.min(1.0 + flatSum, 1.5);
+      if (flatSum > 0.5) {
+        breakdown.push(`(capped at 1.5)`);
+      }
+
+      let finalM = flatM;
+      const multipliers: string[] = [];
+
+      document
+        .querySelectorAll<HTMLInputElement>('input[name="multiplier"]:checked')
+        .forEach((cb) => {
+          const val = parseFloat(cb.dataset.value || "1");
+          finalM *= val;
+          const label =
+            cb.parentElement
+              ?.querySelector("span")
+              ?.textContent?.split(":")[0] || "";
+          multipliers.push(`${label}: x${val.toFixed(1)}`);
+        });
+
+      if (multipliers.length > 0) {
+        breakdown.push(...multipliers);
+      }
+
+      document.getElementById("multiplier-breakdown")!.innerHTML = breakdown
+        .map((line) => `<span>${line}</span>`)
+        .join("<br>");
+
+      document.getElementById("final-multiplier")!.textContent =
+        finalM.toFixed(2);
+
+      const payout = Math.round(currentHours * 4 * finalM);
+      document.getElementById("payout-preview")!.textContent =
+        payout.toString();
+    }
+
+    document
+      .querySelectorAll<HTMLInputElement>(
+        'input[name="buff"], input[name="multiplier"]',
+      )
+      .forEach((cb) => {
+        cb.addEventListener("change", updateMultiplier);
+      });
+
+    document.getElementById("endpoints-dec")!.addEventListener("click", () => {
+      if (endpointsCount > 0) {
+        endpointsCount--;
+        document.getElementById("endpoints-count")!.textContent =
+          endpointsCount.toString();
+        updateMultiplier();
+      }
+    });
+
+    document.getElementById("endpoints-inc")!.addEventListener("click", () => {
+      if (endpointsCount < 4) {
+        endpointsCount++;
+        document.getElementById("endpoints-count")!.textContent =
+          endpointsCount.toString();
+        updateMultiplier();
+      }
+    });
+
+    async function submitReview(action: "approved" | "rejected") {
+      if (!currentSubmissionId) return;
+
+      approveBtn.disabled = true;
+      rejectBtn.disabled = true;
+
+      let flatSum = 0;
+      const buffs: string[] = [];
+
+      document
+        .querySelectorAll<HTMLInputElement>('input[name="buff"]:checked')
+        .forEach((cb) => {
+          flatSum += parseFloat(cb.dataset.value || "0");
+          buffs.push(cb.value);
+        });
+
+      if (endpointsCount > 0) {
+        flatSum += endpointsCount * 0.03;
+        buffs.push(`endpoints:${endpointsCount}`);
+      }
+
+      const flatM = Math.min(1.0 + flatSum, 1.5);
+      let finalM = flatM;
+
+      document
+        .querySelectorAll<HTMLInputElement>('input[name="multiplier"]:checked')
+        .forEach((cb) => {
+          finalM *= parseFloat(cb.dataset.value || "1");
+          buffs.push(cb.value);
+        });
+
+      try {
+        const res = await fetch(`/api/review/${currentSubmissionId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            multiplier: finalM,
+            notes: notesInput.value.trim(),
+            buffs,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || "Failed to submit review");
+          approveBtn.disabled = false;
+          rejectBtn.disabled = false;
+          return;
+        }
+
+        const card = document.querySelector(
+          `.submission-card[data-id="${currentSubmissionId}"]`,
+        );
+        card?.remove();
+
+        const countEl = document.querySelector(".count");
+        if (countEl) {
+          const remaining =
+            document.querySelectorAll(".submission-card").length;
+          countEl.textContent = `${remaining} pending`;
+        }
+
+        if (document.querySelectorAll(".submission-card").length === 0) {
+          const content = document.querySelector(".content");
+          if (content) {
+            content.innerHTML = '<p class="empty">No submissions to review</p>';
+          }
+        }
+
+        closeModal();
+      } catch {
+        alert("Network error");
+        approveBtn.disabled = false;
+        rejectBtn.disabled = false;
+      }
+    }
+
+    approveBtn.addEventListener("click", () => submitReview("approved"));
+    rejectBtn.addEventListener("click", () => {
+      if (confirm("Are you sure you want to reject this submission?")) {
+        submitReview("rejected");
+      }
+    });
+  </script>
+</Layout>

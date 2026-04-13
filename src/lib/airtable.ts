@@ -331,3 +331,164 @@ export async function createSubmission(
 		payout_transaction_id: r.fields.payout_transaction?.[0] ?? undefined,
 	};
 }
+
+export interface SubmissionWithProject extends SubmissionRecord {
+	project_name: string;
+	project_description: string;
+	project_url?: string;
+	repo_url?: string;
+	image_url?: string;
+	user_slack_id: string;
+	created_at: string;
+}
+
+export async function getPendingSubmissions(): Promise<
+	SubmissionWithProject[]
+> {
+	const submissions: SubmissionWithProject[] = [];
+	const filter = encodeURIComponent(`{review_status}="submitted"`);
+	let offset: string | undefined;
+
+	do {
+		const url = new URL(
+			`${BASE()}/submissions?filterByFormula=${filter}&sort%5B0%5D%5Bfield%5D=id&sort%5B0%5D%5Bdirection%5D=asc`,
+		);
+		if (offset) url.searchParams.set("offset", offset);
+		const res = await fetch(url.toString(), { headers: HEADERS() });
+		if (!res.ok) break;
+		const data = await res.json();
+		for (const r of data.records ?? []) {
+			const projectId = r.fields.project?.[0];
+			let project: ProjectRecord | null = null;
+			if (projectId) {
+				project = await getProjectById(projectId);
+			}
+			submissions.push({
+				id: r.id,
+				project_id: projectId ?? "",
+				hours_at_submission: r.fields.hours_at_submission ?? 0,
+				review_status: r.fields.review_status ?? "submitted",
+				reviewer_notes: r.fields.reviewer_notes ?? "",
+				multiplier: r.fields.multiplier ?? 1,
+				payout: r.fields.payout ?? 0,
+				payout_transaction_id: r.fields.payout_transaction?.[0] ?? undefined,
+				project_name: project?.name ?? "",
+				project_description: project?.description ?? "",
+				project_url: project?.project_url,
+				repo_url: project?.repo_url,
+				image_url: project?.image_url,
+				user_slack_id: project?.user_slack_id ?? "",
+				created_at: r.createdTime ?? "",
+			});
+		}
+		offset = data.offset;
+	} while (offset);
+
+	return submissions;
+}
+
+export async function getSubmissionById(
+	id: string,
+): Promise<SubmissionWithProject | null> {
+	const res = await fetch(`${BASE()}/submissions/${id}`, {
+		headers: HEADERS(),
+	});
+	if (!res.ok) return null;
+	const r = await res.json();
+	const projectId = r.fields.project?.[0];
+	let project: ProjectRecord | null = null;
+	if (projectId) {
+		project = await getProjectById(projectId);
+	}
+	return {
+		id: r.id,
+		project_id: projectId ?? "",
+		hours_at_submission: r.fields.hours_at_submission ?? 0,
+		review_status: r.fields.review_status ?? "submitted",
+		reviewer_notes: r.fields.reviewer_notes ?? "",
+		multiplier: r.fields.multiplier ?? 1,
+		payout: r.fields.payout ?? 0,
+		payout_transaction_id: r.fields.payout_transaction?.[0] ?? undefined,
+		project_name: project?.name ?? "",
+		project_description: project?.description ?? "",
+		project_url: project?.project_url,
+		repo_url: project?.repo_url,
+		image_url: project?.image_url,
+		user_slack_id: project?.user_slack_id ?? "",
+		created_at: r.createdTime ?? "",
+	};
+}
+
+export async function updateSubmissionReview(
+	id: string,
+	data: {
+		review_status: "approved" | "rejected";
+		multiplier: number;
+		reviewer_notes: string;
+		buffs: string;
+	},
+): Promise<boolean> {
+	const res = await fetch(`${BASE()}/submissions/${id}`, {
+		method: "PATCH",
+		headers: HEADERS(),
+		body: JSON.stringify({
+			fields: {
+				review_status: data.review_status,
+				multiplier: data.multiplier,
+				reviewer_notes: data.reviewer_notes,
+				buffs: data.buffs,
+			},
+		}),
+	});
+	return res.ok;
+}
+
+export async function updateProjectApprovedHours(
+	id: string,
+	approved_hours: number,
+): Promise<boolean> {
+	const res = await fetch(`${BASE()}/projects/${id}`, {
+		method: "PATCH",
+		headers: HEADERS(),
+		body: JSON.stringify({ fields: { approved_hours } }),
+	});
+	return res.ok;
+}
+
+export async function createLedgerEntry(
+	userAirtableId: string,
+	submissionId: string,
+	reason: string,
+): Promise<string | null> {
+	const res = await fetch(`${BASE()}/ledger`, {
+		method: "POST",
+		headers: HEADERS(),
+		body: JSON.stringify({
+			records: [
+				{
+					fields: {
+						user: [userAirtableId],
+						type: "project_payout",
+						reason,
+						payout_submission: [submissionId],
+					},
+				},
+			],
+		}),
+	});
+	if (!res.ok) return null;
+	const data = await res.json();
+	return data.records?.[0]?.id ?? null;
+}
+
+export async function linkSubmissionPayoutTransaction(
+	submissionId: string,
+	ledgerRecordId: string,
+): Promise<boolean> {
+	const res = await fetch(`${BASE()}/submissions/${submissionId}`, {
+		method: "PATCH",
+		headers: HEADERS(),
+		body: JSON.stringify({ fields: { payout_transaction: [ledgerRecordId] } }),
+	});
+	return res.ok;
+}
