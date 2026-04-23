@@ -21,6 +21,7 @@ const submissions = await getPendingSubmissions();
       <span class="label">REVIEW QUEUE</span>
       <div class="actions">
         <span class="count">{submissions.length} pending</span>
+        <button id="btn-export" class="btn-export">export csv</button>
         <a href="/me" class="back">dashboard</a>
       </div>
     </header>
@@ -47,6 +48,7 @@ const submissions = await getPendingSubmissions();
                     <h2 class="project-name">{sub.project_name}</h2>
                     <p class="submitter" data-slack-id={sub.user_slack_id}>
                       by <span class="submitter-name">{sub.user_slack_id}</span>
+                      <span class="submitter-id">({sub.user_slack_id})</span>
                     </p>
                   </div>
                   <div class="submission-meta">
@@ -110,6 +112,7 @@ const submissions = await getPendingSubmissions();
           <div class="review-project-info">
             <h3 id="review-project-name"></h3>
             <p id="review-submitter"></p>
+            <p id="review-submitter-id" class="review-slack-id"></p>
             <p id="review-hours"></p>
             <div class="review-links">
               <a
@@ -306,6 +309,30 @@ const submissions = await getPendingSubmissions();
       text-underline-offset: 3px;
     }
 
+    .btn-export {
+      font-size: 0.75rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: none;
+      color: #525252;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      padding: 0;
+    }
+
+    .btn-export:hover {
+      color: #f5f5f5;
+    }
+
+    .review-slack-id {
+      font-size: 0.8rem;
+      color: #525252;
+      margin: 0 0 0.25rem 0;
+      font-family: monospace;
+    }
+
     .content {
       display: flex;
       flex-direction: column;
@@ -366,6 +393,11 @@ const submissions = await getPendingSubmissions();
 
     .submitter-name {
       color: #737373;
+    }
+
+    .submitter-id {
+      color: #404040;
+      font-size: 0.75rem;
     }
 
     .submission-meta {
@@ -801,6 +833,8 @@ const submissions = await getPendingSubmissions();
             projectName;
           document.getElementById("review-submitter")!.textContent =
             `Submitter: ${userSlackId}`;
+          document.getElementById("review-submitter-id")!.textContent =
+            `ID: ${userSlackId}`;
           document.getElementById("review-hours")!.textContent =
             `Hours: ${currentHours.toFixed(2)}h`;
 
@@ -834,6 +868,7 @@ const submissions = await getPendingSubmissions();
               }
             })
             .catch(() => {});
+
 
           resetBuffs();
           modal.classList.remove("hidden");
@@ -1020,6 +1055,29 @@ const submissions = await getPendingSubmissions();
         rejectBtn.disabled = false;
       }
     }
+
+    document.getElementById("btn-export")!.addEventListener("click", () => {
+      const cards = document.querySelectorAll<HTMLElement>(".submission-card");
+      const rows: string[][] = [["name", "code_link", "demo_link", "slack_id"]];
+      cards.forEach((card) => {
+        rows.push([
+          card.dataset.projectName || "",
+          card.dataset.repoUrl || "",
+          card.dataset.projectUrl || "",
+          card.dataset.userSlackId || "",
+        ]);
+      });
+      const csv = rows
+        .map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "review-queue.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
 
     approveBtn.addEventListener("click", () => submitReview("approved"));
     rejectBtn.addEventListener("click", () => {
