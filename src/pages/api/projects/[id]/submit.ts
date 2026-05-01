@@ -1,5 +1,10 @@
 import type { APIRoute } from "astro";
-import { createSubmission, getProjectById } from "../../../../lib/airtable";
+import {
+	createSubmission,
+	getProjectById,
+	getUserBySlackId,
+} from "../../../../lib/airtable";
+import { createProject as createFraudProject } from "../../../../lib/fraud";
 import { getSession } from "../../../../lib/session";
 
 export const POST: APIRoute = async ({ cookies, params }) => {
@@ -13,7 +18,11 @@ export const POST: APIRoute = async ({ cookies, params }) => {
 		return Response.json({ error: "Not logged in" }, { status: 401 });
 	}
 
-	const project = await getProjectById(id);
+	const [project, user] = await Promise.all([
+		getProjectById(id),
+		getUserBySlackId(session.slack_id),
+	]);
+
 	if (!project) {
 		return Response.json({ error: "Project not found" }, { status: 404 });
 	}
@@ -55,7 +64,7 @@ export const POST: APIRoute = async ({ cookies, params }) => {
 	let res: Response;
 	try {
 		res = await fetch(apiUrl);
-	} catch (err) {
+	} catch {
 		return Response.json(
 			{ error: "Failed to reach Hackatime" },
 			{ status: 502 },
@@ -68,7 +77,7 @@ export const POST: APIRoute = async ({ cookies, params }) => {
 
 	if (!res.ok) {
 		const body = await res.text().catch(() => "");
-		console.error("[submit] hackatime error body:", body); // TODO: handle {"error": "found nuthin"}
+		console.error("[submit] hackatime error body:", body);
 		return Response.json({ error: "Hackatime error" }, { status: 502 });
 	}
 
@@ -90,6 +99,15 @@ export const POST: APIRoute = async ({ cookies, params }) => {
 			{ status: 500 },
 		);
 	}
+
+	createFraudProject(
+		project.name,
+		project.repo_url,
+		project.project_url,
+		session.slack_id,
+		[project.hackatime_project],
+		submission.id,
+	).catch((e) => console.error("[submit] fraud createProject failed:", e));
 
 	return Response.json({
 		hours_at_submission: submission.hours_at_submission,

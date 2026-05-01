@@ -1,18 +1,52 @@
 ---
+// biome-ignore lint/correctness/noUnusedImports: shut up
 import Layout from "../layouts/Layout.astro";
-import { getSession } from "../lib/session";
 import { getPendingSubmissions } from "../lib/airtable";
+import {
+  createProject as createFraudProject,
+  listProjects,
+} from "../lib/fraud";
+import { getSession } from "../lib/session";
 
 const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
 if (!session) return Astro.redirect("/auth/login");
 
 const adminIds = (import.meta.env.ADMIN_IDS ?? "")
-	.split(",")
-	.map((s: string) => s.trim())
-	.filter(Boolean);
+  .split(",")
+  .map((s: string) => s.trim())
+  .filter(Boolean);
 if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
 
-const submissions = await getPendingSubmissions();
+const [submissions, fraudData] = await Promise.all([
+  getPendingSubmissions(),
+  listProjects().catch(() => ({ projects: [] })),
+]);
+
+const fraudByOrgId = new Map(
+  (fraudData.projects ?? []).map((p) => [p.organizerPlatformId, p]),
+);
+
+const missingInFraud = submissions.filter((sub) => !fraudByOrgId.has(sub.id));
+if (missingInFraud.length > 0) {
+  await Promise.allSettled(
+    missingInFraud.map((sub) =>
+      createFraudProject(
+        sub.project_name,
+        sub.repo_url ?? "",
+        sub.project_url ?? "",
+        sub.user_slack_id,
+        sub.hackatime_project ? [sub.hackatime_project] : [],
+        sub.id,
+      ).catch((e) => console.error("[review] fraud createProject failed:", e)),
+    ),
+  );
+  const updatedFraud = await listProjects().catch(() => ({ projects: [] }));
+  for (const p of updatedFraud.projects ?? []) {
+    fraudByOrgId.set(p.organizerPlatformId, p);
+  }
+}
+
+const approvedSubmissions = submissions;
 ---
 
 <Layout>
@@ -20,7 +54,7 @@ const submissions = await getPendingSubmissions();
     <header class="topbar">
       <span class="label">REVIEW QUEUE</span>
       <div class="actions">
-        <span class="count">{submissions.length} pending</span>
+        <span class="count">{approvedSubmissions.length} pending</span>
         <button id="btn-export" class="btn-export">export csv</button>
         <a href="/me" class="back">dashboard</a>
       </div>
@@ -28,72 +62,89 @@ const submissions = await getPendingSubmissions();
 
     <section class="content">
       {
-        submissions.length === 0 ? (
+        approvedSubmissions.length === 0 ? (
           <p class="empty">No submissions to review</p>
         ) : (
           <div class="submissions-list">
-            {submissions.map((sub) => (
-              <div
-                class="submission-card"
-                data-id={sub.id}
-                data-project-id={sub.project_id}
-                data-hours={sub.hours_at_submission}
-                data-user-slack-id={sub.user_slack_id}
-                data-project-name={sub.project_name}
-                data-project-url={sub.project_url ?? ""}
-                data-repo-url={sub.repo_url ?? ""}
-              >
-                <div class="submission-header">
-                  <div class="submission-info">
-                    <h2 class="project-name">{sub.project_name}</h2>
-                    <p class="submitter" data-slack-id={sub.user_slack_id}>
-                      by <span class="submitter-name">{sub.user_slack_id}</span>
-                      <span class="submitter-id">({sub.user_slack_id})</span>
-                    </p>
+            {approvedSubmissions.map((sub) => {
+              const fraud = fraudByOrgId.get(sub.id);
+              const trustScore = fraud?.review?.trustScore ?? null;
+              const fraudStatus =
+                fraud?.outcome?.status ?? (fraud ? "pending" : "not submitted");
+              return (
+                <div
+                  class="submission-card"
+                  data-id={sub.id}
+                  data-project-id={sub.project_id}
+                  data-hours={sub.hours_at_submission}
+                  data-user-slack-id={sub.user_slack_id}
+                  data-project-name={sub.project_name}
+                  data-project-url={sub.project_url ?? ""}
+                  data-repo-url={sub.repo_url ?? ""}
+                >
+                  <div class="submission-header">
+                    <div class="submission-info">
+                      <h2 class="project-name">{sub.project_name}</h2>
+                      <p class="submitter" data-slack-id={sub.user_slack_id}>
+                        by{" "}
+                        <span class="submitter-name">{sub.user_slack_id}</span>
+                        <span class="submitter-id">({sub.user_slack_id})</span>
+                      </p>
+                    </div>
+                    <div class="submission-meta">
+                      <span class={`fraud-status fraud-status--${fraudStatus}`}>
+                        {fraudStatus}
+                      </span>
+                      {trustScore !== null && (
+                        <span
+                          class={`fraud-score fraud-score--${trustScore >= 7 ? "high" : trustScore >= 4 ? "mid" : "low"}`}
+                        >
+                          trust {trustScore}/10
+                        </span>
+                      )}
+                      <span class="hours">
+                        {sub.hours_at_submission.toFixed(2)}h
+                      </span>
+                      <span class="date">
+                        {new Date(sub.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                  <div class="submission-meta">
-                    <span class="hours">
-                      {sub.hours_at_submission.toFixed(2)}h
-                    </span>
-                    <span class="date">
-                      {new Date(sub.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
 
-                <div class="submission-details">
-                  {sub.project_description && (
-                    <p class="description">{sub.project_description}</p>
-                  )}
-                  <div class="links">
-                    {sub.project_url && (
-                      <a
-                        href={sub.project_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link"
-                      >
-                        project
-                      </a>
+                  <div class="submission-details">
+                    {sub.project_description && (
+                      <p class="description">{sub.project_description}</p>
                     )}
-                    {sub.repo_url && (
-                      <a
-                        href={sub.repo_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link"
-                      >
-                        repo
-                      </a>
-                    )}
+                    <div class="links">
+                      {sub.project_url && (
+                        <a
+                          href={sub.project_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="link"
+                        >
+                          project
+                        </a>
+                      )}
+                      {sub.repo_url && (
+                        <a
+                          href={sub.repo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="link"
+                        >
+                          repo
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <button class="btn-review" data-id={sub.id}>
-                  Review
-                </button>
-              </div>
-            ))}
+                  <button class="btn-review" data-id={sub.id}>
+                    Review
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )
       }
@@ -412,6 +463,59 @@ const submissions = await getPendingSubmissions();
       font-weight: 700;
       font-size: 1rem;
       color: #c41e3a;
+    }
+
+    .fraud-status {
+      font-size: 0.65rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .fraud-status--approved {
+      color: #22c55e;
+      border-color: #22c55e;
+    }
+
+    .fraud-status--rejected {
+      color: #c41e3a;
+      border-color: #c41e3a;
+    }
+
+    .fraud-status--pending {
+      color: #f59e0b;
+      border-color: #f59e0b;
+    }
+
+    .fraud-status--not\ submitted {
+      color: #525252;
+      border-color: #525252;
+    }
+
+    .fraud-score {
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid;
+    }
+
+    .fraud-score--high {
+      color: #22c55e;
+      border-color: #22c55e;
+    }
+
+    .fraud-score--mid {
+      color: #f59e0b;
+      border-color: #f59e0b;
+    }
+
+    .fraud-score--low {
+      color: #c41e3a;
+      border-color: #c41e3a;
     }
 
     .date {
@@ -868,7 +972,6 @@ const submissions = await getPendingSubmissions();
               }
             })
             .catch(() => {});
-
 
           resetBuffs();
           modal.classList.remove("hidden");

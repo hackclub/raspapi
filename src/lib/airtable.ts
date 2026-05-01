@@ -338,6 +338,7 @@ export interface SubmissionWithProject extends SubmissionRecord {
 	project_url?: string;
 	repo_url?: string;
 	image_url?: string;
+	hackatime_project?: string;
 	user_slack_id: string;
 	created_at: string;
 }
@@ -377,6 +378,7 @@ export async function getPendingSubmissions(): Promise<
 				project_url: project?.project_url,
 				repo_url: project?.repo_url,
 				image_url: project?.image_url,
+				hackatime_project: project?.hackatime_project,
 				user_slack_id: project?.user_slack_id ?? "",
 				created_at: r.createdTime ?? "",
 			});
