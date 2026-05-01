@@ -1,10 +1,10 @@
 ---
-// biome-ignore lint/correctness/noUnusedImports: shut up
+// biome-ignore lint/correctness/noUnusedImports: shut up astro
 import Layout from "../layouts/Layout.astro";
 import { getPendingSubmissions } from "../lib/airtable";
 import {
-  createProject as createFraudProject,
-  listProjects,
+	createProject as createFraudProject,
+	listProjects,
 } from "../lib/fraud";
 import { getSession } from "../lib/session";
 
@@ -12,38 +12,38 @@ const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
 if (!session) return Astro.redirect("/auth/login");
 
 const adminIds = (import.meta.env.ADMIN_IDS ?? "")
-  .split(",")
-  .map((s: string) => s.trim())
-  .filter(Boolean);
+	.split(",")
+	.map((s: string) => s.trim())
+	.filter(Boolean);
 if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
 
 const [submissions, fraudData] = await Promise.all([
-  getPendingSubmissions(),
-  listProjects().catch(() => ({ projects: [] })),
+	getPendingSubmissions(),
+	listProjects().catch(() => ({ projects: [] })),
 ]);
 
 const fraudByOrgId = new Map(
-  (fraudData.projects ?? []).map((p) => [p.organizerPlatformId, p]),
+	(fraudData.projects ?? []).map((p) => [p.organizerPlatformId, p]),
 );
 
 const missingInFraud = submissions.filter((sub) => !fraudByOrgId.has(sub.id));
 if (missingInFraud.length > 0) {
-  await Promise.allSettled(
-    missingInFraud.map((sub) =>
-      createFraudProject(
-        sub.project_name,
-        sub.repo_url ?? "",
-        sub.project_url ?? "",
-        sub.user_slack_id,
-        sub.hackatime_project ? [sub.hackatime_project] : [],
-        sub.id,
-      ).catch((e) => console.error("[review] fraud createProject failed:", e)),
-    ),
-  );
-  const updatedFraud = await listProjects().catch(() => ({ projects: [] }));
-  for (const p of updatedFraud.projects ?? []) {
-    fraudByOrgId.set(p.organizerPlatformId, p);
-  }
+	await Promise.allSettled(
+		missingInFraud.map((sub) =>
+			createFraudProject(
+				sub.project_name,
+				sub.repo_url ?? "",
+				sub.project_url ?? "",
+				sub.user_slack_id,
+				sub.hackatime_project ? [sub.hackatime_project] : [],
+				sub.id,
+			).catch((e) => console.error("[review] fraud createProject failed:", e)),
+		),
+	);
+	const updatedFraud = await listProjects().catch(() => ({ projects: [] }));
+	for (const p of updatedFraud.projects ?? []) {
+		fraudByOrgId.set(p.organizerPlatformId, p);
+	}
 }
 
 const approvedSubmissions = submissions;
