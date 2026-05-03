@@ -4,9 +4,9 @@ WORKDIR /raspapi
 
 RUN npm install -g bun
 
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 
-RUN bun install --frozen-lockfile
+RUN bun install
 
 COPY . .
 
@@ -18,7 +18,7 @@ WORKDIR /raspapi
 
 RUN npm install -g bun
 
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 
 RUN bun install --frozen-lockfile --production
 
