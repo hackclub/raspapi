@@ -1133,6 +1133,7 @@ const projects = await getAllProjectsBySlackId(session.slack_id);
             const imgRes = await fetch(`/api/projects/${id}/image`, {
               method: "PUT",
               body: imgFd,
+              mode: 'same-origin',
             });
             if (!imgRes.ok) {
               const imgData = await imgRes.json().catch(() => ({}));
