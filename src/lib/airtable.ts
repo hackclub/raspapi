@@ -582,9 +582,7 @@ export async function createShipEntry(data: {
 		hasCodeUrl: Boolean(data.code_url),
 		hasPlayableUrl: Boolean(data.playable_url),
 		hoursSpent: data.hours_spent,
-		hasOverrideHoursJustification: Boolean(
-			data.override_hours_justification,
-		),
+		hasOverrideHoursJustification: Boolean(data.override_hours_justification),
 		hasScreenshot: Boolean(data.screenshot),
 		hasDescription: Boolean(data.description),
 	});
