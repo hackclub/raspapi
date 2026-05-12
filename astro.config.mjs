@@ -7,24 +7,21 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
-	output: "server",
-	// at 0.0.0.0
-	server: {
-		host: true,
-	},
+  output: "server",
+  // at 0.0.0.0
+  server: {
+    host: true,
+  },
 
-	adapter: node({
-		mode: "standalone",
-	}),
+  adapter: node({
+    mode: "standalone",
+  }),
 
-	vite: {
-		plugins: [tailwindcss()],
-		server: {
-			allowedHosts: ["warthog", "localhost"],
-		},
-	},
+  vite: {
+    plugins: [tailwindcss()],
+  },
 
-	security: {
-		checkOrigin: false,
-	},
+  security: {
+    checkOrigin: false,
+  },
 });
