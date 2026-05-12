@@ -111,7 +111,9 @@ export const POST: APIRoute = async ({ cookies, params, request }) => {
 		reviewer_notes: payload.notes ?? "",
 		override_hours_justification: payload.override_hours_justification,
 		buffs: buffs.join(","),
-		approved_hours: effectiveHours,
+		...(payload.action === "approved"
+			? { approved_hours: effectiveHours }
+			: {}),
 	});
 
 	if (!updated) {
