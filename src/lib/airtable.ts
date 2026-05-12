@@ -578,10 +578,16 @@ export async function createShipEntry(data: {
 		Screenshot: [{ url: data.screenshot }],
 		Description: data.description,
 	};
-	console.log(
-		"[createShipEntry] POST to unified table",
-		JSON.stringify(fields),
-	);
+	console.log("[createShipEntry] POST to unified table", {
+		hasCodeUrl: Boolean(data.code_url),
+		hasPlayableUrl: Boolean(data.playable_url),
+		hoursSpent: data.hours_spent,
+		hasOverrideHoursJustification: Boolean(
+			data.override_hours_justification,
+		),
+		hasScreenshot: Boolean(data.screenshot),
+		hasDescription: Boolean(data.description),
+	});
 	const res = await fetch(
 		`${BASE()}/${import.meta.env.AIRTABLE_UNIFIED_TABLE_ID}`,
 		{
