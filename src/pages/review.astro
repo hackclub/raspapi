@@ -308,6 +308,25 @@ const approvedSubmissions = submissions;
               rows="3"
               placeholder="Optional notes about this submission..."></textarea>
           </div>
+
+          <div class="notes-section">
+            <label for="override-hours">Override Hours Spent</label>
+            <input
+              type="number"
+              id="override-hours"
+              min="0.01"
+              step="0.01"
+              placeholder="Leave blank to use submitted hours"
+            />
+          </div>
+
+          <div class="notes-section">
+            <label for="override-justification">Override Hours Justification <span class="required-mark">*</span></label>
+            <textarea
+              id="override-justification"
+              rows="3"
+              placeholder="Required — explain your reasoning for this review..."></textarea>
+          </div>
         </div>
 
         <div class="modal-footer">
@@ -828,6 +847,26 @@ const approvedSubmissions = submissions;
       border-color: #404040;
     }
 
+    .notes-section input[type="number"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid #262626;
+      color: #f5f5f5;
+      font-family: "Inter", sans-serif;
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .notes-section input[type="number"]:focus {
+      border-color: #404040;
+    }
+
+    .required-mark {
+      color: #c41e3a;
+    }
+
     .modal-footer {
       display: flex;
       justify-content: flex-end;
@@ -903,6 +942,12 @@ const approvedSubmissions = submissions;
     ) as HTMLButtonElement;
     const notesInput = document.getElementById(
       "reviewer-notes",
+    ) as HTMLTextAreaElement;
+    const overrideHoursInput = document.getElementById(
+      "override-hours",
+    ) as HTMLInputElement;
+    const overrideJustificationInput = document.getElementById(
+      "override-justification",
     ) as HTMLTextAreaElement;
 
     let currentSubmissionId: string | null = null;
@@ -992,6 +1037,8 @@ const approvedSubmissions = submissions;
       endpointsCount = 0;
       document.getElementById("endpoints-count")!.textContent = "0";
       notesInput.value = "";
+      overrideHoursInput.value = "";
+      overrideJustificationInput.value = "";
       updateMultiplier();
     }
 
@@ -1050,7 +1097,8 @@ const approvedSubmissions = submissions;
       document.getElementById("final-multiplier")!.textContent =
         finalM.toFixed(2);
 
-      const payout = Math.round(currentHours * 4 * finalM);
+      const effectiveHours = parseFloat(overrideHoursInput.value) || currentHours;
+      const payout = Math.round(effectiveHours * 4 * finalM);
       document.getElementById("payout-preview")!.textContent =
         payout.toString();
     }
@@ -1062,6 +1110,8 @@ const approvedSubmissions = submissions;
       .forEach((cb) => {
         cb.addEventListener("change", updateMultiplier);
       });
+
+    overrideHoursInput.addEventListener("input", updateMultiplier);
 
     document.getElementById("endpoints-dec")!.addEventListener("click", () => {
       if (endpointsCount > 0) {
@@ -1083,6 +1133,12 @@ const approvedSubmissions = submissions;
 
     async function submitReview(action: "approved" | "rejected") {
       if (!currentSubmissionId) return;
+
+      const justification = overrideJustificationInput.value.trim();
+      if (!justification) {
+        alert("Override Hours Justification is required.");
+        return;
+      }
 
       approveBtn.disabled = true;
       rejectBtn.disabled = true;
@@ -1121,6 +1177,10 @@ const approvedSubmissions = submissions;
             multiplier: finalM,
             notes: notesInput.value.trim(),
             buffs,
+            override_hours: overrideHoursInput.value
+              ? parseFloat(overrideHoursInput.value)
+              : undefined,
+            override_hours_justification: justification,
           }),
         });
 

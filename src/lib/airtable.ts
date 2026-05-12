@@ -14,6 +14,33 @@ export interface UserRecord {
 	balance: number;
 	row_number?: number;
 	referer?: number;
+	first_name?: string;
+	last_name?: string;
+	legal_first_name?: string;
+	legal_last_name?: string;
+	email?: string;
+	birthday?: string;
+	address_line_1?: string;
+	address_line_2?: string;
+	address_city?: string;
+	address_state?: string;
+	address_postal_code?: string;
+	address_country?: string;
+}
+
+export interface IdentityFields {
+	first_name?: string;
+	last_name?: string;
+	legal_first_name?: string;
+	legal_last_name?: string;
+	email?: string;
+	birthday?: string;
+	address_line_1?: string;
+	address_line_2?: string;
+	address_city?: string;
+	address_state?: string;
+	address_postal_code?: string;
+	address_country?: string;
 }
 
 export interface ProjectRecord {
@@ -37,13 +64,41 @@ export interface SubmissionRecord {
 	hours_at_submission: number;
 	review_status: "submitted" | "rejected" | "approved";
 	reviewer_notes: string;
+	override_hours_justification: string;
 	multiplier: number;
 	payout: number;
 	payout_transaction_id?: string;
 }
 
+function parseUserRecord(r: {
+	id: string;
+	fields: Record<string, unknown>;
+}): UserRecord {
+	return {
+		id: r.id,
+		slack_id: r.fields.slack_id as string,
+		hackatime_token: (r.fields.hackatime_token as string) ?? undefined,
+		balance: (r.fields.balance as number) ?? 0,
+		row_number: (r.fields.row_number as number) ?? undefined,
+		referer: (r.fields.referer as number) ?? undefined,
+		first_name: (r.fields.first_name as string) ?? undefined,
+		last_name: (r.fields.last_name as string) ?? undefined,
+		legal_first_name: (r.fields.legal_first_name as string) ?? undefined,
+		legal_last_name: (r.fields.legal_last_name as string) ?? undefined,
+		email: (r.fields.email as string) ?? undefined,
+		birthday: (r.fields.birthday as string) ?? undefined,
+		address_line_1: (r.fields.address_line_1 as string) ?? undefined,
+		address_line_2: (r.fields.address_line_2 as string) ?? undefined,
+		address_city: (r.fields.address_city as string) ?? undefined,
+		address_state: (r.fields.address_state as string) ?? undefined,
+		address_postal_code: (r.fields.address_postal_code as string) ?? undefined,
+		address_country: (r.fields.address_country as string) ?? undefined,
+	};
+}
+
 export async function upsertUser(
 	slack_id: string,
+	identity?: IdentityFields,
 	referer?: number,
 ): Promise<UserRecord | null> {
 	const filter = encodeURIComponent(`{slack_id}="${slack_id}"`);
@@ -55,18 +110,18 @@ export async function upsertUser(
 		const data = await findRes.json();
 		if (data.records?.length > 0) {
 			const r = data.records[0];
-			return {
-				id: r.id,
-				slack_id: r.fields.slack_id,
-				hackatime_token: r.fields.hackatime_token ?? undefined,
-				balance: r.fields.balance ?? 0,
-				row_number: r.fields.row_number ?? undefined,
-				referer: r.fields.referer ?? undefined,
-			};
+			if (identity) {
+				await fetch(`${BASE()}/users/${r.id}`, {
+					method: "PATCH",
+					headers: HEADERS(),
+					body: JSON.stringify({ fields: identity }),
+				});
+			}
+			return parseUserRecord(r);
 		}
 	}
 
-	const fields: Record<string, unknown> = { slack_id };
+	const fields: Record<string, unknown> = { slack_id, ...identity };
 	if (referer !== undefined) fields.referer = referer;
 
 	const createRes = await fetch(`${BASE()}/users`, {
@@ -78,13 +133,7 @@ export async function upsertUser(
 	const created = await createRes.json();
 	const r = created.records?.[0];
 	if (!r) return null;
-	return {
-		id: r.id,
-		slack_id: r.fields.slack_id,
-		balance: 0,
-		row_number: r.fields.row_number ?? undefined,
-		referer: r.fields.referer ?? undefined,
-	};
+	return parseUserRecord(r);
 }
 
 export async function getUserBySlackId(
@@ -98,15 +147,7 @@ export async function getUserBySlackId(
 	if (!res.ok) return null;
 	const data = await res.json();
 	if (!data.records?.length) return null;
-	const r = data.records[0];
-	return {
-		id: r.id,
-		slack_id: r.fields.slack_id,
-		hackatime_token: r.fields.hackatime_token ?? undefined,
-		balance: r.fields.balance ?? 0,
-		row_number: r.fields.row_number ?? undefined,
-		referer: r.fields.referer ?? undefined,
-	};
+	return parseUserRecord(data.records[0]);
 }
 
 export async function updateHackatimeToken(
@@ -326,6 +367,7 @@ export async function createSubmission(
 		hours_at_submission: r.fields.hours_at_submission ?? 0,
 		review_status: r.fields.review_status,
 		reviewer_notes: r.fields.reviewer_notes ?? "",
+		override_hours_justification: r.fields.override_hours_justification ?? "",
 		multiplier: r.fields.multiplier ?? 1,
 		payout: r.fields.payout ?? 0,
 		payout_transaction_id: r.fields.payout_transaction?.[0] ?? undefined,
@@ -370,6 +412,8 @@ export async function getPendingSubmissions(): Promise<
 				hours_at_submission: r.fields.hours_at_submission ?? 0,
 				review_status: r.fields.review_status ?? "submitted",
 				reviewer_notes: r.fields.reviewer_notes ?? "",
+				override_hours_justification:
+					r.fields.override_hours_justification ?? "",
 				multiplier: r.fields.multiplier ?? 1,
 				payout: r.fields.payout ?? 0,
 				payout_transaction_id: r.fields.payout_transaction?.[0] ?? undefined,
@@ -408,6 +452,7 @@ export async function getSubmissionById(
 		hours_at_submission: r.fields.hours_at_submission ?? 0,
 		review_status: r.fields.review_status ?? "submitted",
 		reviewer_notes: r.fields.reviewer_notes ?? "",
+		override_hours_justification: r.fields.override_hours_justification ?? "",
 		multiplier: r.fields.multiplier ?? 1,
 		payout: r.fields.payout ?? 0,
 		payout_transaction_id: r.fields.payout_transaction?.[0] ?? undefined,
@@ -427,21 +472,31 @@ export async function updateSubmissionReview(
 		review_status: "approved" | "rejected";
 		multiplier: number;
 		reviewer_notes: string;
+		override_hours_justification: string;
 		buffs: string;
+		approved_hours: number;
 	},
 ): Promise<boolean> {
+	const body = {
+		fields: {
+			review_status: data.review_status,
+			multiplier: data.multiplier,
+			reviewer_notes: data.reviewer_notes,
+			override_hours_justification: data.override_hours_justification,
+			buffs: data.buffs,
+			approved_hours: data.approved_hours,
+		},
+	};
+	console.log("[updateSubmissionReview] PATCH", id, JSON.stringify(body));
 	const res = await fetch(`${BASE()}/submissions/${id}`, {
 		method: "PATCH",
 		headers: HEADERS(),
-		body: JSON.stringify({
-			fields: {
-				review_status: data.review_status,
-				multiplier: data.multiplier,
-				reviewer_notes: data.reviewer_notes,
-				buffs: data.buffs,
-			},
-		}),
+		body: JSON.stringify(body),
 	});
+	if (!res.ok) {
+		const text = await res.text();
+		console.error("[updateSubmissionReview] Airtable error", res.status, text);
+	}
 	return res.ok;
 }
 
@@ -492,5 +547,54 @@ export async function linkSubmissionPayoutTransaction(
 		headers: HEADERS(),
 		body: JSON.stringify({ fields: { payout_transaction: [ledgerRecordId] } }),
 	});
+	return res.ok;
+}
+
+export async function createShipEntry(data: {
+	user: UserRecord;
+	code_url: string;
+	playable_url: string;
+	hours_spent: number;
+	override_hours_justification: string;
+	screenshot: string;
+	description: string;
+}): Promise<boolean> {
+	const fields: Record<string, unknown> = {
+		"First Name": data.user.legal_first_name ?? data.user.first_name ?? "",
+		"Last Name": data.user.legal_last_name ?? data.user.last_name ?? "",
+		Email: data.user.email ?? "",
+		Birthday: data.user.birthday ?? "",
+		"Address (Line 1)": data.user.address_line_1 ?? "",
+		"Address (Line 2)": data.user.address_line_2 ?? "",
+		City: data.user.address_city ?? "",
+		"State / Province": data.user.address_state ?? "",
+		"ZIP / Postal Code": data.user.address_postal_code ?? "",
+		Country: data.user.address_country ?? "",
+		"Code URL": data.code_url,
+		"Playable URL": data.playable_url,
+		"Optional - Override Hours Spent": data.hours_spent,
+		"Optional - Override Hours Spent Justification":
+			data.override_hours_justification,
+		Screenshot: [{ url: data.screenshot }],
+		Description: data.description,
+	};
+	console.log(
+		"[createShipEntry] POST to unified table",
+		JSON.stringify(fields),
+	);
+	const res = await fetch(
+		`${BASE()}/${import.meta.env.AIRTABLE_UNIFIED_TABLE_ID}`,
+		{
+			method: "POST",
+			headers: HEADERS(),
+			body: JSON.stringify({ records: [{ fields }] }),
+		},
+	);
+	if (!res.ok) {
+		const text = await res.text();
+		console.error("[createShipEntry] Airtable error", res.status, text);
+	} else {
+		console.log("[createShipEntry] success");
+	}
 	return res.ok;
 }

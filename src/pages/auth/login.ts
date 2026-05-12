@@ -5,7 +5,8 @@ export const GET: APIRoute = async () => {
 		response_type: "code",
 		client_id: import.meta.env.HCA_CLIENT_ID,
 		redirect_uri: `${import.meta.env.PUBLIC_BASE_URL}/auth/callback`,
-		scope: "verification_status slack_id",
+		scope:
+			"verification_status slack_id basic_info address birthdate email name",
 	});
 
 	return Response.redirect(

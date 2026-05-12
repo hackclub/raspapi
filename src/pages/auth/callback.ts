@@ -52,7 +52,28 @@ export const GET: APIRoute = async ({ url, cookies }) => {
 	const referer = refCookie ? parseInt(refCookie.value, 10) : undefined;
 	cookies.delete("ref", { path: "/" });
 
-	await upsertUser(slack_id, referer);
+	const primaryAddress =
+		identity.addresses?.find((a: { primary: boolean }) => a.primary) ??
+		identity.addresses?.[0];
+
+	await upsertUser(
+		slack_id,
+		{
+			first_name: identity.first_name ?? undefined,
+			last_name: identity.last_name ?? undefined,
+			legal_first_name: identity.legal_first_name ?? undefined,
+			legal_last_name: identity.legal_last_name ?? undefined,
+			email: identity.primary_email ?? undefined,
+			birthday: identity.birthday ?? undefined,
+			address_line_1: primaryAddress?.line_1 ?? undefined,
+			address_line_2: primaryAddress?.line_2 ?? undefined,
+			address_city: primaryAddress?.city ?? undefined,
+			address_state: primaryAddress?.state ?? undefined,
+			address_postal_code: primaryAddress?.postal_code ?? undefined,
+			address_country: primaryAddress?.country ?? undefined,
+		},
+		referer,
+	);
 
 	const sessionCookie = await setSessionCookie(
 		{ slack_id },

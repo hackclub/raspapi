@@ -1,13 +1,13 @@
 import type { APIRoute } from "astro";
 import { z } from "astro/zod";
 import {
-	getSubmissionById,
-	updateSubmissionReview,
-	getProjectById,
-	updateProjectApprovedHours,
-	getUserBySlackId,
 	createLedgerEntry,
+	createShipEntry,
+	getProjectById,
+	getSubmissionById,
+	getUserBySlackId,
 	linkSubmissionPayoutTransaction,
+	updateSubmissionReview,
 } from "../../../lib/airtable";
 import { getSession } from "../../../lib/session";
 
@@ -16,6 +16,8 @@ const ReviewSchema = z.object({
 	multiplier: z.number().min(1).max(3),
 	notes: z.string().optional(),
 	buffs: z.array(z.string()).optional(),
+	override_hours: z.number().positive().optional(),
+	override_hours_justification: z.string(),
 });
 
 import { App } from "slack.ts";
@@ -100,12 +102,16 @@ export const POST: APIRoute = async ({ cookies, params, request }) => {
 	}
 
 	const buffs = payload.buffs ?? [];
+	const effectiveHours =
+		payload.override_hours ?? submission.hours_at_submission;
 
 	const updated = await updateSubmissionReview(id, {
 		review_status: payload.action,
 		multiplier: payload.multiplier,
 		reviewer_notes: payload.notes ?? "",
+		override_hours_justification: payload.override_hours_justification,
 		buffs: buffs.join(","),
+		approved_hours: effectiveHours,
 	});
 
 	if (!updated) {
@@ -121,11 +127,12 @@ export const POST: APIRoute = async ({ cookies, params, request }) => {
 			getUserBySlackId(submission.user_slack_id),
 		]);
 
-		if (project) {
-			const newApprovedHours =
-				(project.approved_hours ?? 0) + submission.hours_at_submission;
-			await updateProjectApprovedHours(submission.project_id, newApprovedHours);
-		}
+		// console.log(
+		// 	"[review] approval lookup — project:",
+		// 	project?.id ?? "null",
+		// 	"submitter:",
+		// 	submitter?.id ?? "null",
+		// );
 
 		if (submitter) {
 			const ledgerId = await createLedgerEntry(
@@ -141,6 +148,18 @@ export const POST: APIRoute = async ({ cookies, params, request }) => {
 					id,
 				);
 			}
+
+			if (project) {
+				createShipEntry({
+					user: submitter,
+					code_url: project.repo_url ?? "",
+					playable_url: project.project_url ?? "",
+					hours_spent: effectiveHours,
+					override_hours_justification: payload.override_hours_justification,
+					screenshot: project.image_url ?? "",
+					description: project.description,
+				}).catch((e) => console.error("[review] createShipEntry failed:", e));
+			}
 		} else {
 			console.error(
 				"[review] Could not find user for slack_id",
@@ -149,9 +168,7 @@ export const POST: APIRoute = async ({ cookies, params, request }) => {
 		}
 	}
 
-	const payout = Math.round(
-		submission.hours_at_submission * 4 * payload.multiplier,
-	);
+	const payout = Math.round(effectiveHours * 4 * payload.multiplier);
 	const buffBreakdown = formatBuffBreakdown(buffs);
 
 	const airtableLink =
@@ -166,7 +183,7 @@ export const POST: APIRoute = async ({ cookies, params, request }) => {
 Submitter: <@${submission.user_slack_id}>
 Project: ${submission.project_name}${submission.project_url ? ` - ${submission.project_url}` : ""}
 Repo: ${submission.repo_url || "none"}
-Hours: ${submission.hours_at_submission.toFixed(2)}h
+Hours: ${effectiveHours.toFixed(2)}h${payload.override_hours !== undefined ? ` (submitted: ${submission.hours_at_submission.toFixed(2)}h)` : ""}
 Multiplier: ${payload.multiplier.toFixed(2)} (${buffBreakdown})
 Payout: ${payout} :raspberry_pi:
 Notes: ${payload.notes || "none"}
@@ -179,7 +196,7 @@ Airtable: ${airtableLink}`;
 		payload.action === "approved"
 			? [
 					`Your project *${submission.project_name}* has been approved! :yayayayayay:`,
-					`*Hours:* ${submission.hours_at_submission.toFixed(2)}h`,
+					`*Hours:* ${effectiveHours.toFixed(2)}h${payload.override_hours !== undefined ? ` (submitted: ${submission.hours_at_submission.toFixed(2)}h)` : ""}`,
 					`*Multiplier:* ${payload.multiplier.toFixed(2)} (${buffBreakdown})`,
 					`*Payout:* ${payout} :raspberry_pi:`,
 					payload.notes ? `*Reviewer notes:* ${payload.notes}` : null,
