@@ -127,13 +127,6 @@ export const POST: APIRoute = async ({ cookies, params, request }) => {
 			getUserBySlackId(submission.user_slack_id),
 		]);
 
-		// console.log(
-		// 	"[review] approval lookup — project:",
-		// 	project?.id ?? "null",
-		// 	"submitter:",
-		// 	submitter?.id ?? "null",
-		// );
-
 		if (submitter) {
 			const ledgerId = await createLedgerEntry(
 				submitter.id,

@@ -111,11 +111,14 @@ export async function upsertUser(
 		if (data.records?.length > 0) {
 			const r = data.records[0];
 			if (identity) {
-				await fetch(`${BASE()}/users/${r.id}`, {
+				const patchRes = await fetch(`${BASE()}/users/${r.id}`, {
 					method: "PATCH",
 					headers: HEADERS(),
 					body: JSON.stringify({ fields: identity }),
 				});
+				if (!patchRes.ok) {
+					console.error("[upsertUser] Failed to update identity", r.id, patchRes.status);
+				}
 			}
 			return parseUserRecord(r);
 		}
@@ -487,7 +490,6 @@ export async function updateSubmissionReview(
 			approved_hours: data.approved_hours,
 		},
 	};
-	console.log("[updateSubmissionReview] PATCH", id, JSON.stringify(body));
 	const res = await fetch(`${BASE()}/submissions/${id}`, {
 		method: "PATCH",
 		headers: HEADERS(),

@@ -1037,7 +1037,7 @@ const approvedSubmissions = submissions;
       endpointsCount = 0;
       document.getElementById("endpoints-count")!.textContent = "0";
       notesInput.value = "";
-      overrideHoursInput.value = "";
+      overrideHoursInput.value = currentHours.toFixed(2);
       overrideJustificationInput.value = "";
       updateMultiplier();
     }
@@ -1097,7 +1097,8 @@ const approvedSubmissions = submissions;
       document.getElementById("final-multiplier")!.textContent =
         finalM.toFixed(2);
 
-      const effectiveHours = parseFloat(overrideHoursInput.value) || currentHours;
+      const parsedOverride = parseFloat(overrideHoursInput.value);
+      const effectiveHours = !isNaN(parsedOverride) ? parsedOverride : currentHours;
       const payout = Math.round(effectiveHours * 4 * finalM);
       document.getElementById("payout-preview")!.textContent =
         payout.toString();
@@ -1135,7 +1136,7 @@ const approvedSubmissions = submissions;
       if (!currentSubmissionId) return;
 
       const justification = overrideJustificationInput.value.trim();
-      if (!justification) {
+      if (action === "approved" && !justification) {
         alert("Override Hours Justification is required.");
         return;
       }
@@ -1168,6 +1169,9 @@ const approvedSubmissions = submissions;
           buffs.push(cb.value);
         });
 
+      const overrideVal = parseFloat(overrideHoursInput.value);
+      const hoursChanged = !isNaN(overrideVal) && overrideVal !== currentHours;
+
       try {
         const res = await fetch(`/api/review/${currentSubmissionId}`, {
           method: "POST",
@@ -1177,9 +1181,7 @@ const approvedSubmissions = submissions;
             multiplier: finalM,
             notes: notesInput.value.trim(),
             buffs,
-            override_hours: overrideHoursInput.value
-              ? parseFloat(overrideHoursInput.value)
-              : undefined,
+            override_hours: hoursChanged ? overrideVal : undefined,
             override_hours_justification: justification,
           }),
         });
