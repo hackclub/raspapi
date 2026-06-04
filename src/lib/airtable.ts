@@ -626,6 +626,14 @@ export interface ShopOrderRecord {
 	item_name: string;
 	status: "submitted" | "fulfilled";
 	created_at: string;
+	address?: {
+		line_1?: string;
+		line_2?: string;
+		city?: string;
+		state?: string;
+		postal_code?: string;
+		country?: string;
+	};
 }
 
 export async function getShopItems(): Promise<ShopItemRecord[]> {
@@ -727,9 +735,7 @@ export async function getAllShopOrders(): Promise<ShopOrderRecord[]> {
 	let offset: string | undefined;
 
 	do {
-		const url = new URL(
-			`${BASE()}/Shop%20Orders?sort%5B0%5D%5Bfield%5D=created_at&sort%5B0%5D%5Bdirection%5D=desc`,
-		);
+		const url = new URL(`${BASE()}/Shop%20Orders`);
 		if (offset) url.searchParams.set("offset", offset);
 		const res = await fetch(url.toString(), { headers: HEADERS() });
 		if (!res.ok) break;
@@ -737,16 +743,48 @@ export async function getAllShopOrders(): Promise<ShopOrderRecord[]> {
 		for (const r of data.records ?? []) {
 			const userIds: string[] = r.fields.user ?? [];
 			const itemIds: string[] = r.fields.item ?? [];
-			const userSlackIds: string[] = r.fields.user_slack_id ?? [];
-			const itemNames: string[] = r.fields.item_name ?? [];
+
+			let userSlackId = "";
+			let address: ShopOrderRecord["address"];
+			if (userIds[0]) {
+				const userRes = await fetch(`${BASE()}/users/${userIds[0]}`, {
+					headers: HEADERS(),
+				});
+				if (userRes.ok) {
+					const userData = await userRes.json();
+					const f = userData.fields ?? {};
+					userSlackId = (f.slack_id as string) ?? "";
+					address = {
+						line_1: (f.address_line_1 as string) ?? undefined,
+						line_2: (f.address_line_2 as string) ?? undefined,
+						city: (f.address_city as string) ?? undefined,
+						state: (f.address_state as string) ?? undefined,
+						postal_code: (f.address_postal_code as string) ?? undefined,
+						country: (f.address_country as string) ?? undefined,
+					};
+				}
+			}
+
+			let itemName = "";
+			if (itemIds[0]) {
+				const itemRes = await fetch(`${BASE()}/Shop%20Items/${itemIds[0]}`, {
+					headers: HEADERS(),
+				});
+				if (itemRes.ok) {
+					const itemData = await itemRes.json();
+					itemName = (itemData.fields?.Name as string) ?? "";
+				}
+			}
+
 			orders.push({
 				id: r.id,
 				user_id: userIds[0] ?? "",
-				user_slack_id: userSlackIds[0] ?? "",
+				user_slack_id: userSlackId,
 				item_id: itemIds[0] ?? "",
-				item_name: itemNames[0] ?? "",
+				item_name: itemName,
 				status: r.fields.status ?? "submitted",
 				created_at: r.createdTime ?? "",
+				address,
 			});
 		}
 		offset = data.offset;

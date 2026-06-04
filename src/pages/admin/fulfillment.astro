@@ -44,29 +44,40 @@ const orders = await getAllShopOrders();
               <span class="col-status">Status</span>
               <span class="col-action">Action</span>
             </div>
-            {orders.map((order) => (
-              <div class="order-row" data-id={order.id} data-status={order.status}>
-                <span class="col-user" data-slack-id={order.user_slack_id}>
-                  {order.user_slack_id}
-                </span>
-                <span class="col-item">{order.item_name}</span>
-                <span class="col-date">
-                  {new Date(order.created_at).toLocaleDateString()}
-                </span>
-                <span class={`col-status status-badge status-badge--${order.status}`}>
-                  {order.status}
-                </span>
-                <span class="col-action">
-                  <button
-                    class="btn-toggle"
-                    data-id={order.id}
-                    data-current={order.status}
-                  >
-                    {order.status === "submitted" ? "mark fulfilled" : "mark submitted"}
-                  </button>
-                </span>
-              </div>
-            ))}
+            {orders.map((order) => {
+              const addr = order.address;
+              const addrParts = [addr?.line_1, addr?.line_2, addr?.city, addr?.state, addr?.postal_code, addr?.country].filter(Boolean);
+              const addrStr = addrParts.length > 0 ? addrParts.join(", ") : "no address on file";
+              return (
+                <div class="order-group" data-status={order.status}>
+                  <div class="order-row" data-id={order.id}>
+                    <a class="col-user" data-slack-id={order.user_slack_id} href={`https://hackclub.slack.com/team/${order.user_slack_id}`} target="_blank" rel="noopener noreferrer">
+                      {order.user_slack_id}
+                    </a>
+                    <span class="col-item">{order.item_name}</span>
+                    <span class="col-date">
+                      {new Date(order.created_at).toLocaleDateString()}
+                    </span>
+                    <span class={`col-status status-badge status-badge--${order.status}`}>
+                      {order.status}
+                    </span>
+                    <span class="col-action">
+                      <button class="btn-address">address</button>
+                      <button
+                        class="btn-toggle"
+                        data-id={order.id}
+                        data-current={order.status}
+                      >
+                        {order.status === "submitted" ? "mark fulfilled" : "mark submitted"}
+                      </button>
+                    </span>
+                  </div>
+                  <div class="address-row hidden">
+                    <span class="address-text">{addrStr}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )
       }
@@ -160,7 +171,7 @@ const orders = await getAllShopOrders();
 
     .table-header {
       display: grid;
-      grid-template-columns: 1fr 1fr 0.7fr 0.6fr 0.8fr;
+      grid-template-columns: 1fr 1fr 0.7fr 0.6fr 1fr;
       padding: 0.75rem 1.25rem;
       border-bottom: 1px solid #262626;
       font-family: "Syne", sans-serif;
@@ -171,27 +182,52 @@ const orders = await getAllShopOrders();
       text-transform: uppercase;
     }
 
+    .order-group {
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .order-group:last-child {
+      border-bottom: none;
+    }
+
+    .order-group.hidden {
+      display: none;
+    }
+
     .order-row {
       display: grid;
-      grid-template-columns: 1fr 1fr 0.7fr 0.6fr 0.8fr;
+      grid-template-columns: 1fr 1fr 0.7fr 0.6fr 1fr;
       padding: 0.75rem 1.25rem;
-      border-bottom: 1px solid #1a1a1a;
       align-items: center;
       font-size: 0.85rem;
       color: #a3a3a3;
     }
 
-    .order-row:last-child {
-      border-bottom: none;
+    .address-row {
+      padding: 0.5rem 1.25rem 0.75rem;
+      background: #111;
+      border-top: 1px solid #1a1a1a;
     }
 
-    .order-row.hidden {
+    .address-row.hidden {
       display: none;
+    }
+
+    .address-text {
+      font-size: 0.8rem;
+      color: #a3a3a3;
+      font-family: "Inter", sans-serif;
     }
 
     .col-user {
       color: #f5f5f5;
       font-size: 0.85rem;
+      text-decoration: none;
+    }
+
+    .col-user:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
 
     .col-item {
@@ -222,6 +258,33 @@ const orders = await getAllShopOrders();
     .status-badge--fulfilled {
       color: #22c55e;
       border-color: #22c55e;
+    }
+
+    .col-action {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .btn-address {
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: 1px solid #262626;
+      color: #525252;
+      padding: 0.25rem 0.6rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-address:hover {
+      border-color: #737373;
+      color: #a3a3a3;
+    }
+
+    .btn-address.active {
+      border-color: #737373;
+      color: #f5f5f5;
     }
 
     .btn-toggle {
@@ -267,13 +330,23 @@ const orders = await getAllShopOrders();
         filterBtns.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         const filter = btn.dataset.filter!;
-        document.querySelectorAll<HTMLElement>(".order-row").forEach((row) => {
-          if (filter === "all" || row.dataset.status === filter) {
-            row.classList.remove("hidden");
+        document.querySelectorAll<HTMLElement>(".order-group").forEach((group) => {
+          if (filter === "all" || group.dataset.status === filter) {
+            group.classList.remove("hidden");
           } else {
-            row.classList.add("hidden");
+            group.classList.add("hidden");
           }
         });
+      });
+    });
+
+    // Address reveal buttons
+    document.querySelectorAll<HTMLButtonElement>(".btn-address").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const group = btn.closest(".order-group")!;
+        const addrRow = group.querySelector(".address-row")!;
+        addrRow.classList.toggle("hidden");
+        btn.classList.toggle("active");
       });
     });
 
@@ -306,10 +379,10 @@ const orders = await getAllShopOrders();
           btn.textContent = newStatus === "submitted" ? "mark fulfilled" : "mark submitted";
           btn.disabled = false;
 
-          const row = btn.closest(".order-row") as HTMLElement;
-          row.dataset.status = newStatus;
+          const group = btn.closest(".order-group") as HTMLElement;
+          group.dataset.status = newStatus;
 
-          const badge = row.querySelector(".status-badge")!;
+          const badge = group.querySelector(".status-badge")!;
           badge.className = `col-status status-badge status-badge--${newStatus}`;
           badge.textContent = newStatus;
 
@@ -317,7 +390,7 @@ const orders = await getAllShopOrders();
           const activeFilter = document.querySelector<HTMLButtonElement>(".filter-btn.active");
           const filter = activeFilter?.dataset.filter ?? "all";
           if (filter !== "all" && newStatus !== filter) {
-            row.classList.add("hidden");
+            group.classList.add("hidden");
           }
         } catch {
           alert("Network error");
