@@ -51,7 +51,7 @@ const orders = await getAllShopOrders();
               return (
                 <div class="order-group" data-status={order.status}>
                   <div class="order-row" data-id={order.id}>
-                    <a class="col-user" data-slack-id={order.user_slack_id} href={`https://hackclub.slack.com/team/${order.user_slack_id}`} target="_blank" rel="noopener noreferrer">
+                    <a class="col-user" data-slack-id={order.user_slack_id} href={`/admin/user/${order.user_slack_id}`}>
                       {order.user_slack_id}
                     </a>
                     <span class="col-item">{order.item_name}</span>

@@ -183,11 +183,7 @@ export async function getAllUsers(): Promise<UserRecord[]> {
 		if (!res.ok) break;
 		const data = await res.json();
 		for (const r of data.records ?? []) {
-			records.push({
-				id: r.id,
-				slack_id: r.fields.slack_id,
-				balance: r.fields.balance ?? 0,
-			});
+			records.push(parseUserRecord(r));
 		}
 		offset = data.offset;
 	} while (offset);
@@ -803,6 +799,113 @@ export async function updateShopOrderStatus(
 		body: JSON.stringify({ fields: { status } }),
 	});
 	return res.ok;
+}
+
+export interface LedgerEntryRecord {
+	id: string;
+	type: "project_payout" | "shop_purchase";
+	reason: string;
+	amount: number | null;
+	created_at: string;
+}
+
+export async function getLedgerEntriesByUserId(
+	userAirtableId: string,
+): Promise<LedgerEntryRecord[]> {
+	const entries: LedgerEntryRecord[] = [];
+	let offset: string | undefined;
+
+	do {
+		const url = new URL(`${BASE()}/ledger`);
+		url.searchParams.set("sort[0][field]", "id");
+		url.searchParams.set("sort[0][direction]", "desc");
+		if (offset) url.searchParams.set("offset", offset);
+		const res = await fetch(url.toString(), { headers: HEADERS() });
+		if (!res.ok) break;
+		const data = await res.json();
+		for (const r of data.records ?? []) {
+			const userIds: string[] = r.fields.user ?? [];
+			if (!userIds.includes(userAirtableId)) continue;
+
+			let amount: number | null = null;
+			const type = r.fields.type ?? "project_payout";
+			if (type === "project_payout") {
+				const subId = r.fields.payout_submission?.[0];
+				if (subId) {
+					const subRes = await fetch(`${BASE()}/submissions/${subId}`, { headers: HEADERS() });
+					if (subRes.ok) {
+						const subData = await subRes.json();
+						amount = (subData.fields?.payout as number) ?? null;
+					}
+				}
+			} else if (type === "shop_purchase") {
+				const itemId = r.fields.purchased_item?.[0];
+				if (itemId) {
+					const itemRes = await fetch(`${BASE()}/Shop%20Items/${itemId}`, { headers: HEADERS() });
+					if (itemRes.ok) {
+						const itemData = await itemRes.json();
+						amount = (itemData.fields?.Price as number) ?? null;
+						if (amount !== null) amount = -amount;
+					}
+				}
+			}
+
+			entries.push({
+				id: r.id,
+				type,
+				reason: r.fields.reason ?? "",
+				amount,
+				created_at: r.createdTime ?? "",
+			});
+		}
+		offset = data.offset;
+	} while (offset);
+
+	return entries;
+}
+
+export async function getShopOrdersByUserId(
+	userAirtableId: string,
+): Promise<ShopOrderRecord[]> {
+	const orders: ShopOrderRecord[] = [];
+	let offset: string | undefined;
+
+	do {
+		const url = new URL(`${BASE()}/Shop%20Orders`);
+		url.searchParams.set("sort[0][field]", "id");
+		url.searchParams.set("sort[0][direction]", "desc");
+		if (offset) url.searchParams.set("offset", offset);
+		const res = await fetch(url.toString(), { headers: HEADERS() });
+		if (!res.ok) break;
+		const data = await res.json();
+		for (const r of data.records ?? []) {
+			const userIds: string[] = r.fields.user ?? [];
+			if (!userIds.includes(userAirtableId)) continue;
+			const itemIds: string[] = r.fields.item ?? [];
+			let itemName = "";
+			if (itemIds[0]) {
+				const itemRes = await fetch(`${BASE()}/Shop%20Items/${itemIds[0]}`, {
+					headers: HEADERS(),
+				});
+				if (itemRes.ok) {
+					const itemData = await itemRes.json();
+					itemName = (itemData.fields?.Name as string) ?? "";
+				}
+			}
+			orders.push({
+				id: r.id,
+				user_id: userAirtableId,
+				user_slack_id: "",
+				item_id: itemIds[0] ?? "",
+				item_name: itemName,
+				status: r.fields.status ?? "submitted",
+				created_at: r.createdTime ?? "",
+			});
+		}
+		offset = data.offset;
+	} while (offset);
+
+	return orders;
 }
 
 export async function createShipEntry(data: {

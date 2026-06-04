@@ -1,0 +1,536 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { getSession } from "../../../lib/session";
+import {
+  getUserBySlackId,
+  getAllProjectsBySlackId,
+  getLedgerEntriesByUserId,
+  getShopOrdersByUserId,
+} from "../../../lib/airtable";
+
+const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
+if (!session) return Astro.redirect("/auth/login");
+
+const adminIds = (import.meta.env.ADMIN_IDS ?? "")
+  .split(",")
+  .map((s: string) => s.trim())
+  .filter(Boolean);
+if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
+
+const { slack_id } = Astro.params;
+if (!slack_id) return Astro.redirect("/admin/users");
+
+const user = await getUserBySlackId(slack_id);
+if (!user) return Astro.redirect("/admin/users");
+
+const [projects, ledger, orders] = await Promise.all([
+  getAllProjectsBySlackId(slack_id),
+  getLedgerEntriesByUserId(user.id),
+  getShopOrdersByUserId(user.id),
+]);
+---
+
+<Layout>
+  <main class="page">
+    <header class="topbar">
+      <span class="label">USER</span>
+      <div class="actions">
+        <a href="/admin/users" class="back">all users</a>
+        <a href="/admin/fulfillment" class="back">fulfillment</a>
+        <a href="/me" class="back">dashboard</a>
+      </div>
+    </header>
+
+    <section class="user-card">
+      <div class="user-header">
+        <img id="user-avatar" class="avatar" src="" alt="" style="display:none" />
+        <div class="user-info">
+          <h1 class="user-name" id="user-display-name">{slack_id}</h1>
+          <div class="user-meta">
+            {user.email && <span class="meta-item pii">{user.email}</span>}
+            <a
+              href={`https://hackclub.slack.com/team/${slack_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="slack-link"
+            >
+              Slack profile
+            </a>
+          </div>
+        </div>
+        <div class="balance-display">
+          <span class="balance-amount">{user.balance.toFixed(1)}</span>
+          <span class="balance-label">raspberries</span>
+        </div>
+      </div>
+
+      <div class="user-details">
+        {user.first_name && (
+          <div class="detail">
+            <span class="detail-label">Name</span>
+            <span class="detail-value">{[user.first_name, user.last_name].filter(Boolean).join(" ")}</span>
+          </div>
+        )}
+        {user.legal_first_name && (
+          <div class="detail">
+            <span class="detail-label">Legal name</span>
+            <span class="detail-value pii">{[user.legal_first_name, user.legal_last_name].filter(Boolean).join(" ")}</span>
+          </div>
+        )}
+        {user.birthday && (
+          <div class="detail">
+            <span class="detail-label">Birthday</span>
+            <span class="detail-value pii">{user.birthday}</span>
+          </div>
+        )}
+        {user.address_line_1 && (
+          <div class="detail">
+            <span class="detail-label">Address</span>
+            <span class="detail-value pii">
+              {[user.address_line_1, user.address_line_2, user.address_city, user.address_state, user.address_postal_code, user.address_country].filter(Boolean).join(", ")}
+            </span>
+          </div>
+        )}
+        <div class="detail">
+          <span class="detail-label">Slack ID</span>
+          <span class="detail-value mono">{slack_id}</span>
+        </div>
+        <div class="detail">
+          <span class="detail-label">Airtable ID</span>
+          <span class="detail-value mono">{user.id}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Projects <span class="count">({projects.length})</span></h2>
+      {projects.length === 0 ? (
+        <p class="empty">No projects</p>
+      ) : (
+        <div class="data-table">
+          <div class="table-header projects-grid">
+            <span>Name</span>
+            <span>Approved hours</span>
+            <span>Pending</span>
+          </div>
+          {projects.map((p) => (
+            <div class="table-row projects-grid">
+              <span class="col-primary">{p.name}</span>
+              <span>{p.approved_hours}h</span>
+              <span>{p.has_pending_submission ? "yes" : "no"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Transactions <span class="count">({ledger.length})</span></h2>
+      {ledger.length === 0 ? (
+        <p class="empty">No transactions</p>
+      ) : (
+        <div class="data-table">
+          <div class="table-header ledger-grid">
+            <span>Type</span>
+            <span>Reason</span>
+            <span>Amount</span>
+            <span>Date</span>
+          </div>
+          {ledger.map((entry) => (
+            <div class="table-row ledger-grid">
+              <span class={`type-badge type-badge--${entry.type}`}>
+                {entry.type === "project_payout" ? "payout" : "purchase"}
+              </span>
+              <span class="col-reason">{entry.reason}</span>
+              <span class={`col-amount ${entry.amount !== null && entry.amount >= 0 ? "amount-positive" : "amount-negative"}`}>
+                {entry.amount !== null ? `${entry.amount > 0 ? "+" : ""}${entry.amount.toFixed(1)}` : "—"}
+              </span>
+              <span class="col-date">{new Date(entry.created_at).toLocaleDateString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Shop Orders <span class="count">({orders.length})</span></h2>
+      {orders.length === 0 ? (
+        <p class="empty">No orders</p>
+      ) : (
+        <div class="data-table">
+          <div class="table-header orders-grid">
+            <span>Item</span>
+            <span>Status</span>
+            <span>Date</span>
+          </div>
+          {orders.map((order) => (
+            <div class="table-row orders-grid">
+              <span class="col-primary">{order.item_name}</span>
+              <span class={`status-badge status-badge--${order.status}`}>{order.status}</span>
+              <span class="col-date">{new Date(order.created_at).toLocaleDateString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  </main>
+
+  <style>
+    .page {
+      min-height: 100vh;
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 7rem;
+    }
+
+    .label {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      color: #c41e3a;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .back {
+      font-size: 0.75rem;
+      color: #8a8a8a;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .user-card {
+      border: 1px solid #262626;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .user-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid #262626;
+    }
+
+    .user-info {
+      flex: 1;
+    }
+
+    .user-name {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      margin: 0;
+      color: #f5f5f5;
+    }
+
+    .user-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 0.25rem;
+    }
+
+    .meta-item {
+      font-size: 0.8rem;
+      color: #737373;
+    }
+
+    .slack-link {
+      font-size: 0.75rem;
+      color: #c41e3a;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .balance-display {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .balance-amount {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 1.5rem;
+      color: #f5f5f5;
+    }
+
+    .balance-label {
+      font-size: 0.65rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: #737373;
+      text-transform: uppercase;
+    }
+
+    .user-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 0.75rem;
+      border-top: 1px solid #1a1a1a;
+      padding-top: 1rem;
+    }
+
+    .detail {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .detail-label {
+      font-size: 0.6rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: #737373;
+      text-transform: uppercase;
+    }
+
+    .detail-value {
+      font-size: 0.85rem;
+      color: #a3a3a3;
+    }
+
+    .detail-value.mono {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #737373;
+    }
+
+    .pii {
+      color: transparent;
+      background: #1a1a1a;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+      user-select: none;
+    }
+
+    .pii:hover {
+      color: #a3a3a3;
+      background: transparent;
+      user-select: auto;
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .section-title {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      color: #a3a3a3;
+      text-transform: uppercase;
+      margin: 0;
+    }
+
+    .count {
+      color: #737373;
+      font-weight: 700;
+    }
+
+    .empty {
+      font-size: 0.85rem;
+      color: #737373;
+      margin: 0;
+    }
+
+    .data-table {
+      border: 1px solid #262626;
+    }
+
+    .table-header {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid #262626;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      color: #737373;
+      text-transform: uppercase;
+    }
+
+    .table-row {
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
+      color: #a3a3a3;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .table-row:last-child {
+      border-bottom: none;
+    }
+
+    .projects-grid {
+      display: grid;
+      grid-template-columns: 1fr 0.6fr 0.4fr;
+      align-items: center;
+    }
+
+    .ledger-grid {
+      display: grid;
+      grid-template-columns: 0.5fr 1fr 0.4fr 0.5fr;
+      align-items: center;
+    }
+
+    .orders-grid {
+      display: grid;
+      grid-template-columns: 1fr 0.5fr 0.5fr;
+      align-items: center;
+    }
+
+    .col-primary {
+      color: #f5f5f5;
+    }
+
+    .col-reason {
+      color: #a3a3a3;
+      font-size: 0.8rem;
+    }
+
+    .col-amount {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .amount-positive {
+      color: #22c55e;
+    }
+
+    .amount-negative {
+      color: #f59e0b;
+    }
+
+    .col-date {
+      color: #737373;
+      font-size: 0.8rem;
+    }
+
+    .type-badge {
+      font-size: 0.6rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid;
+      width: fit-content;
+    }
+
+    .type-badge--project_payout {
+      color: #22c55e;
+      border-color: #22c55e;
+    }
+
+    .type-badge--shop_purchase {
+      color: #f59e0b;
+      border-color: #f59e0b;
+    }
+
+    .status-badge {
+      font-size: 0.6rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid;
+      width: fit-content;
+    }
+
+    .status-badge--submitted {
+      color: #f59e0b;
+      border-color: #f59e0b;
+    }
+
+    .status-badge--fulfilled {
+      color: #22c55e;
+      border-color: #22c55e;
+    }
+
+    @media (max-width: 768px) {
+      .page {
+        padding: 1.5rem 1rem;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding-left: 0;
+        padding-top: 3.5rem;
+      }
+
+      .user-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .balance-display {
+        align-items: flex-start;
+      }
+
+      .user-details {
+        grid-template-columns: 1fr;
+      }
+
+      .table-header {
+        display: none;
+      }
+
+      .table-row.projects-grid,
+      .table-row.ledger-grid,
+      .table-row.orders-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+    }
+  </style>
+
+  <script define:vars={{ slack_id }}>
+    (async () => {
+      try {
+        const res = await fetch(`https://cachet.dunkirk.sh/users/${slack_id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.displayName) {
+          document.getElementById("user-display-name").textContent = data.displayName;
+        }
+        if (data.imageUrl) {
+          const avatar = document.getElementById("user-avatar");
+          avatar.src = data.imageUrl;
+          avatar.style.display = "block";
+        }
+      } catch {}
+    })();
+  </script>
+</Layout>

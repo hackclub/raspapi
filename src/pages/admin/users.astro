@@ -13,37 +13,75 @@ const adminIds = (import.meta.env.ADMIN_IDS ?? "")
 if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
 
 const users = await getAllUsers();
+const totalBalance = users.reduce((sum, u) => sum + u.balance, 0);
 ---
 
 <Layout>
   <main class="page">
     <header class="topbar">
-      <span class="label">ADMIN</span>
-      <a href="/me" class="back">back</a>
+      <span class="label">USERS</span>
+      <div class="actions">
+        <a href="/admin/fulfillment" class="back">fulfillment</a>
+        <a href="/admin/approved" class="back">approved</a>
+        <a href="/review" class="back">review</a>
+        <a href="/me" class="back">dashboard</a>
+      </div>
     </header>
 
+    <div class="stats-row">
+      <div class="stat">
+        <span class="stat-value">{users.length}</span>
+        <span class="stat-label">users</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{totalBalance.toFixed(1)}</span>
+        <span class="stat-label">total raspberries</span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input
+        type="text"
+        id="search"
+        class="search-input"
+        placeholder="search by name or slack id..."
+        autocomplete="off"
+      />
+      <div class="sort-buttons">
+        <button class="sort-btn active" data-sort="name">name</button>
+        <button class="sort-btn" data-sort="balance-desc">balance &darr;</button>
+        <button class="sort-btn" data-sort="balance-asc">balance &uarr;</button>
+      </div>
+    </div>
+
     <section class="content">
-      <p class="count">{users.length} user{users.length !== 1 ? "s" : ""}</p>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Slack ID</th>
-            <th>Airtable ID</th>
-          </tr>
-        </thead>
-        <tbody>
-          {
-            users.map((u, i) => (
-              <tr>
-                <td class="num">{i + 1}</td>
-                <td>{u.slack_id}</td>
-                <td class="muted">{u.id}</td>
-              </tr>
-            ))
-          }
-        </tbody>
-      </table>
+      <div class="users-grid">
+        {users.map((u) => {
+          const displayName = [u.first_name, u.last_name].filter(Boolean).join(" ");
+          return (
+            <a
+              href={`/admin/user/${u.slack_id}`}
+              class="user-card"
+              data-slack-id={u.slack_id}
+              data-balance={u.balance}
+              data-name={displayName.toLowerCase()}
+            >
+              <img class="card-avatar" data-avatar-for={u.slack_id} src="" alt="" style="display:none" />
+              <div class="card-info">
+                <span class="card-name" data-display-name={u.slack_id}>
+                  {displayName || u.slack_id}
+                </span>
+                <span class="card-slack">{u.slack_id}</span>
+              </div>
+              <div class="card-balance">
+                <span class="card-balance-value">{u.balance.toFixed(1)}</span>
+                <span class="card-balance-label">rpi</span>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+      <p class="no-results hidden">No users match your search</p>
     </section>
   </main>
 
@@ -53,7 +91,7 @@ const users = await getAllUsers();
       padding: 2rem 2.5rem;
       display: flex;
       flex-direction: column;
-      gap: 2rem;
+      gap: 1.5rem;
     }
 
     .topbar {
@@ -71,11 +109,94 @@ const users = await getAllUsers();
       color: #c41e3a;
     }
 
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
     .back {
       font-size: 0.75rem;
       color: #8a8a8a;
       text-decoration: underline;
       text-underline-offset: 3px;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 2rem;
+      padding-left: 7rem;
+    }
+
+    .stat {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+    }
+
+    .stat-value {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: #f5f5f5;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      color: #737373;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding-left: 7rem;
+    }
+
+    .search-input {
+      flex: 1;
+      max-width: 360px;
+      font-size: 0.8rem;
+      font-family: "Inter", sans-serif;
+      background: none;
+      border: 1px solid #262626;
+      color: #f5f5f5;
+      padding: 0.45rem 0.75rem;
+      outline: none;
+    }
+
+    .search-input::placeholder {
+      color: #525252;
+    }
+
+    .search-input:focus {
+      border-color: #404040;
+    }
+
+    .sort-buttons {
+      display: flex;
+      gap: 0.35rem;
+    }
+
+    .sort-btn {
+      font-size: 0.65rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: 1px solid #262626;
+      color: #8a8a8a;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+    }
+
+    .sort-btn:hover {
+      border-color: #404040;
+      color: #a3a3a3;
+    }
+
+    .sort-btn.active {
+      border-color: #c41e3a;
+      color: #c41e3a;
     }
 
     .content {
@@ -84,42 +205,92 @@ const users = await getAllUsers();
       gap: 1rem;
     }
 
-    .count {
-      font-size: 0.8rem;
+    .users-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 0.5rem;
+    }
+
+    .user-card {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid #1a1a1a;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s;
+    }
+
+    .user-card:hover {
+      border-color: #404040;
+    }
+
+    .user-card.hidden {
+      display: none;
+    }
+
+    .card-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid #262626;
+      flex-shrink: 0;
+    }
+
+    .card-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+
+    .card-name {
+      font-size: 0.85rem;
+      color: #f5f5f5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-slack {
+      font-size: 0.65rem;
+      color: #525252;
+      font-family: monospace;
+    }
+
+    .card-balance {
+      display: flex;
+      align-items: baseline;
+      gap: 0.25rem;
+      flex-shrink: 0;
+    }
+
+    .card-balance-value {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #f5f5f5;
+    }
+
+    .card-balance-label {
+      font-size: 0.55rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      color: #525252;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .no-results {
+      font-size: 0.85rem;
       color: #737373;
       margin: 0;
     }
 
-    .table {
-      border-collapse: collapse;
-      width: 100%;
-      font-size: 0.875rem;
-    }
-
-    .table th {
-      text-align: left;
-      padding: 0.5rem 1rem;
-      font-family: "Syne", sans-serif;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      color: #737373;
-      border-bottom: 1px solid #262626;
-    }
-
-    .table td {
-      padding: 0.6rem 1rem;
-      border-bottom: 1px solid #1a1a1a;
-      color: #f5f5f5;
-    }
-
-    .num {
-      color: #737373;
-      width: 3rem;
-    }
-
-    .muted {
-      color: #737373;
-      font-size: 0.8rem;
+    .no-results.hidden {
+      display: none;
     }
 
     @media (max-width: 768px) {
@@ -135,10 +306,80 @@ const users = await getAllUsers();
         padding-top: 3.5rem;
       }
 
-      .table {
-        display: block;
-        overflow-x: auto;
+      .stats-row {
+        padding-left: 0;
+      }
+
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding-left: 0;
+      }
+
+      .search-input {
+        max-width: none;
+      }
+
+      .users-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
+
+  <script>
+    const nameCache: Record<string, { displayName?: string; imageUrl?: string }> = {};
+    document.querySelectorAll<HTMLElement>(".user-card").forEach(async (card) => {
+      const slackId = card.dataset.slackId;
+      if (!slackId) return;
+      try {
+        const res = await fetch(`https://cachet.dunkirk.sh/users/${slackId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        nameCache[slackId] = data;
+        if (data.displayName) {
+          const nameEl = card.querySelector(".card-name");
+          if (nameEl) nameEl.textContent = data.displayName;
+          card.dataset.name = data.displayName.toLowerCase();
+        }
+        if (data.imageUrl) {
+          const avatar = card.querySelector<HTMLImageElement>(".card-avatar");
+          if (avatar) {
+            avatar.src = data.imageUrl;
+            avatar.style.display = "block";
+          }
+        }
+      } catch {}
+    });
+
+    const searchInput = document.getElementById("search") as HTMLInputElement;
+    const noResults = document.querySelector(".no-results") as HTMLElement;
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.toLowerCase().trim();
+      let visible = 0;
+      document.querySelectorAll<HTMLElement>(".user-card").forEach((card) => {
+        const name = card.dataset.name ?? "";
+        const slackId = (card.dataset.slackId ?? "").toLowerCase();
+        const match = !q || name.includes(q) || slackId.includes(q);
+        card.classList.toggle("hidden", !match);
+        if (match) visible++;
+      });
+      noResults.classList.toggle("hidden", visible > 0);
+    });
+
+    const grid = document.querySelector(".users-grid") as HTMLElement;
+    document.querySelectorAll<HTMLButtonElement>(".sort-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".sort-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const sort = btn.dataset.sort!;
+        const cards = [...grid.querySelectorAll<HTMLElement>(".user-card")];
+        cards.sort((a, b) => {
+          if (sort === "balance-desc") return (Number(b.dataset.balance) || 0) - (Number(a.dataset.balance) || 0);
+          if (sort === "balance-asc") return (Number(a.dataset.balance) || 0) - (Number(b.dataset.balance) || 0);
+          return (a.dataset.name ?? "").localeCompare(b.dataset.name ?? "");
+        });
+        cards.forEach((c) => grid.appendChild(c));
+      });
+    });
+  </script>
 </Layout>
