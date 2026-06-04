@@ -605,6 +605,164 @@ export async function linkSubmissionPayoutTransaction(
 	return res.ok;
 }
 
+export interface ShopItemRecord {
+	id: string;
+	name: string;
+	description: string;
+	price: number;
+	imageUrl?: string;
+	priority: boolean;
+}
+
+export interface ShopOrderRecord {
+	id: string;
+	user_id: string;
+	user_slack_id: string;
+	item_id: string;
+	item_name: string;
+	status: "submitted" | "fulfilled";
+	created_at: string;
+}
+
+export async function getShopItems(): Promise<ShopItemRecord[]> {
+	const res = await fetch(`${BASE()}/Shop%20Items`, { headers: HEADERS() });
+	if (!res.ok) return [];
+	const data = await res.json();
+	return (data.records ?? []).map(
+		(r: { id: string; fields: Record<string, unknown> }) => ({
+			id: r.id,
+			name: (r.fields.Name as string) ?? "",
+			description: (r.fields.Description as string) ?? "",
+			price: (r.fields.Price as number) ?? 0,
+			imageUrl: (r.fields.Image as string | undefined) ?? undefined,
+			priority: (r.fields.Priority as boolean) ?? false,
+		}),
+	);
+}
+
+export async function getShopItemById(
+	id: string,
+): Promise<ShopItemRecord | null> {
+	const res = await fetch(`${BASE()}/Shop%20Items/${id}`, {
+		headers: HEADERS(),
+	});
+	if (!res.ok) return null;
+	const r = await res.json();
+	return {
+		id: r.id,
+		name: (r.fields.Name as string) ?? "",
+		description: (r.fields.Description as string) ?? "",
+		price: (r.fields.Price as number) ?? 0,
+		imageUrl: (r.fields.Image as string | undefined) ?? undefined,
+		priority: (r.fields.Priority as boolean) ?? false,
+	};
+}
+
+export async function createShopOrder(
+	userId: string,
+	itemId: string,
+): Promise<ShopOrderRecord | null> {
+	const res = await fetch(`${BASE()}/Shop%20Orders`, {
+		method: "POST",
+		headers: HEADERS(),
+		body: JSON.stringify({
+			records: [
+				{
+					fields: {
+						user: [userId],
+						item: [itemId],
+						status: "submitted",
+					},
+				},
+			],
+		}),
+	});
+	if (!res.ok) return null;
+	const data = await res.json();
+	const r = data.records?.[0];
+	if (!r) return null;
+	return {
+		id: r.id,
+		user_id: userId,
+		user_slack_id: "",
+		item_id: itemId,
+		item_name: "",
+		status: r.fields.status ?? "submitted",
+		created_at: r.createdTime ?? "",
+	};
+}
+
+export async function createShopLedgerEntry(
+	userAirtableId: string,
+	shopItemId: string,
+	reason: string,
+): Promise<string | null> {
+	const res = await fetch(`${BASE()}/ledger`, {
+		method: "POST",
+		headers: HEADERS(),
+		body: JSON.stringify({
+			records: [
+				{
+					fields: {
+						user: [userAirtableId],
+						type: "shop_purchase",
+						reason,
+						purchased_item: [shopItemId],
+					},
+				},
+			],
+		}),
+	});
+	if (!res.ok) return null;
+	const data = await res.json();
+	return data.records?.[0]?.id ?? null;
+}
+
+export async function getAllShopOrders(): Promise<ShopOrderRecord[]> {
+	const orders: ShopOrderRecord[] = [];
+	let offset: string | undefined;
+
+	do {
+		const url = new URL(
+			`${BASE()}/Shop%20Orders?sort%5B0%5D%5Bfield%5D=created_at&sort%5B0%5D%5Bdirection%5D=desc`,
+		);
+		if (offset) url.searchParams.set("offset", offset);
+		const res = await fetch(url.toString(), { headers: HEADERS() });
+		if (!res.ok) break;
+		const data = await res.json();
+		for (const r of data.records ?? []) {
+			const userIds: string[] = r.fields.user ?? [];
+			const itemIds: string[] = r.fields.item ?? [];
+			const userSlackIds: string[] = r.fields.user_slack_id ?? [];
+			const itemNames: string[] = r.fields.item_name ?? [];
+			orders.push({
+				id: r.id,
+				user_id: userIds[0] ?? "",
+				user_slack_id: userSlackIds[0] ?? "",
+				item_id: itemIds[0] ?? "",
+				item_name: itemNames[0] ?? "",
+				status: r.fields.status ?? "submitted",
+				created_at: r.createdTime ?? "",
+			});
+		}
+		offset = data.offset;
+	} while (offset);
+
+	return orders;
+}
+
+export async function updateShopOrderStatus(
+	orderId: string,
+	status: "submitted" | "fulfilled",
+): Promise<boolean> {
+	const res = await fetch(`${BASE()}/Shop%20Orders/${orderId}`, {
+		method: "PATCH",
+		headers: HEADERS(),
+		body: JSON.stringify({ fields: { status } }),
+	});
+	return res.ok;
+}
+
 export async function createShipEntry(data: {
 	user: UserRecord;
 	code_url: string;

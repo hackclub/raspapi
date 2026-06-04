@@ -1,0 +1,330 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getSession } from "../../lib/session";
+import { getAllShopOrders } from "../../lib/airtable";
+
+const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
+if (!session) return Astro.redirect("/auth/login");
+
+const adminIds = (import.meta.env.ADMIN_IDS ?? "")
+	.split(",")
+	.map((s: string) => s.trim())
+	.filter(Boolean);
+if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
+
+const orders = await getAllShopOrders();
+---
+
+<Layout>
+  <main class="page">
+    <header class="topbar">
+      <span class="label">FULFILLMENT</span>
+      <div class="actions">
+        <span class="count">{orders.length} orders</span>
+        <a href="/me" class="back">dashboard</a>
+      </div>
+    </header>
+
+    <div class="filters">
+      <button class="filter-btn active" data-filter="all">all</button>
+      <button class="filter-btn" data-filter="submitted">submitted</button>
+      <button class="filter-btn" data-filter="fulfilled">fulfilled</button>
+    </div>
+
+    <section class="content">
+      {
+        orders.length === 0 ? (
+          <p class="empty">No orders yet</p>
+        ) : (
+          <div class="orders-table">
+            <div class="table-header">
+              <span class="col-user">User</span>
+              <span class="col-item">Item</span>
+              <span class="col-date">Date</span>
+              <span class="col-status">Status</span>
+              <span class="col-action">Action</span>
+            </div>
+            {orders.map((order) => (
+              <div class="order-row" data-id={order.id} data-status={order.status}>
+                <span class="col-user" data-slack-id={order.user_slack_id}>
+                  {order.user_slack_id}
+                </span>
+                <span class="col-item">{order.item_name}</span>
+                <span class="col-date">
+                  {new Date(order.created_at).toLocaleDateString()}
+                </span>
+                <span class={`col-status status-badge status-badge--${order.status}`}>
+                  {order.status}
+                </span>
+                <span class="col-action">
+                  <button
+                    class="btn-toggle"
+                    data-id={order.id}
+                    data-current={order.status}
+                  >
+                    {order.status === "submitted" ? "mark fulfilled" : "mark submitted"}
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </section>
+  </main>
+
+  <style>
+    .page {
+      min-height: 100vh;
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 7rem;
+    }
+
+    .label {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      color: #c41e3a;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .count {
+      font-size: 0.8rem;
+      color: #525252;
+    }
+
+    .back {
+      font-size: 0.75rem;
+      color: #525252;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 0.5rem;
+      padding-left: 7rem;
+    }
+
+    .filter-btn {
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: 1px solid #262626;
+      color: #525252;
+      padding: 0.3rem 0.75rem;
+      cursor: pointer;
+    }
+
+    .filter-btn:hover {
+      border-color: #404040;
+      color: #737373;
+    }
+
+    .filter-btn.active {
+      border-color: #c41e3a;
+      color: #c41e3a;
+    }
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .empty {
+      font-size: 0.875rem;
+      color: #525252;
+      margin: 0;
+    }
+
+    .orders-table {
+      border: 1px solid #262626;
+    }
+
+    .table-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr 0.7fr 0.6fr 0.8fr;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid #262626;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      color: #525252;
+      text-transform: uppercase;
+    }
+
+    .order-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 0.7fr 0.6fr 0.8fr;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid #1a1a1a;
+      align-items: center;
+      font-size: 0.85rem;
+      color: #a3a3a3;
+    }
+
+    .order-row:last-child {
+      border-bottom: none;
+    }
+
+    .order-row.hidden {
+      display: none;
+    }
+
+    .col-user {
+      color: #f5f5f5;
+      font-size: 0.85rem;
+    }
+
+    .col-item {
+      color: #a3a3a3;
+    }
+
+    .col-date {
+      color: #525252;
+      font-size: 0.8rem;
+    }
+
+    .status-badge {
+      font-size: 0.65rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid;
+      width: fit-content;
+    }
+
+    .status-badge--submitted {
+      color: #f59e0b;
+      border-color: #f59e0b;
+    }
+
+    .status-badge--fulfilled {
+      color: #22c55e;
+      border-color: #22c55e;
+    }
+
+    .btn-toggle {
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: 1px solid #404040;
+      color: #737373;
+      padding: 0.25rem 0.6rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-toggle:hover {
+      border-color: #f5f5f5;
+      color: #f5f5f5;
+    }
+
+    .btn-toggle:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  </style>
+
+  <script>
+    // Resolve display names
+    document.querySelectorAll<HTMLElement>(".col-user[data-slack-id]").forEach(async (el) => {
+      const slackId = el.dataset.slackId;
+      if (!slackId) return;
+      try {
+        const res = await fetch(`https://cachet.dunkirk.sh/users/${slackId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.displayName) el.textContent = data.displayName;
+      } catch {}
+    });
+
+    // Filter buttons
+    const filterBtns = document.querySelectorAll<HTMLButtonElement>(".filter-btn");
+    filterBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        filterBtns.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const filter = btn.dataset.filter!;
+        document.querySelectorAll<HTMLElement>(".order-row").forEach((row) => {
+          if (filter === "all" || row.dataset.status === filter) {
+            row.classList.remove("hidden");
+          } else {
+            row.classList.add("hidden");
+          }
+        });
+      });
+    });
+
+    // Toggle status buttons
+    document.querySelectorAll<HTMLButtonElement>(".btn-toggle").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const orderId = btn.dataset.id!;
+        const current = btn.dataset.current as "submitted" | "fulfilled";
+        const newStatus = current === "submitted" ? "fulfilled" : "submitted";
+
+        btn.disabled = true;
+        btn.textContent = "updating...";
+
+        try {
+          const res = await fetch(`/api/shop/orders/${orderId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            alert(data.error || "Failed to update");
+            btn.disabled = false;
+            btn.textContent = current === "submitted" ? "mark fulfilled" : "mark submitted";
+            return;
+          }
+
+          btn.dataset.current = newStatus;
+          btn.textContent = newStatus === "submitted" ? "mark fulfilled" : "mark submitted";
+          btn.disabled = false;
+
+          const row = btn.closest(".order-row") as HTMLElement;
+          row.dataset.status = newStatus;
+
+          const badge = row.querySelector(".status-badge")!;
+          badge.className = `col-status status-badge status-badge--${newStatus}`;
+          badge.textContent = newStatus;
+
+          // Re-apply active filter
+          const activeFilter = document.querySelector<HTMLButtonElement>(".filter-btn.active");
+          const filter = activeFilter?.dataset.filter ?? "all";
+          if (filter !== "all" && newStatus !== filter) {
+            row.classList.add("hidden");
+          }
+        } catch {
+          alert("Network error");
+          btn.disabled = false;
+          btn.textContent = current === "submitted" ? "mark fulfilled" : "mark submitted";
+        }
+      });
+    });
+  </script>
+</Layout>

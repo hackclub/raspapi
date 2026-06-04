@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import { getSession } from "../lib/session";
-import { getUserBySlackId } from "../lib/airtable";
+import { getUserBySlackId, getShopItems } from "../lib/airtable";
 
 const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
 if (!session) return Astro.redirect("/auth/login");
@@ -9,9 +9,7 @@ if (!session) return Astro.redirect("/auth/login");
 const userRecord = await getUserBySlackId(session.slack_id);
 const hackatimeConnected = !!userRecord?.hackatime_token;
 
-const SHOP_THRESHOLD = 50;
 const raspberryBalance = userRecord?.balance ?? 0;
-const shopUnlocked = raspberryBalance >= SHOP_THRESHOLD;
 
 const adminIds = (import.meta.env.ADMIN_IDS ?? "")
 	.split(",")
@@ -19,37 +17,7 @@ const adminIds = (import.meta.env.ADMIN_IDS ?? "")
 	.filter(Boolean);
 const isAdmin = adminIds.includes(session.slack_id);
 
-interface ShopItem {
-	id: string;
-	name: string;
-	description: string;
-	price: number;
-	imageUrl?: string;
-}
-
-let shopItems: ShopItem[] = [];
-try {
-	const res = await fetch(
-		`https://api.airtable.com/v0/${import.meta.env.AIRTABLE_BASE_ID}/Shop%20Items`,
-		{
-			headers: {
-				Authorization: `Bearer ${import.meta.env.AIRTABLE_API_KEY}`,
-			},
-		},
-	);
-	if (res.ok) {
-		const data = await res.json();
-		shopItems = (data.records ?? []).map(
-			(r: { id: string; fields: Record<string, unknown> }) => ({
-				id: r.id,
-				name: (r.fields.Name as string) ?? "",
-				description: (r.fields.Description as string) ?? "",
-				price: (r.fields.Price as number) ?? 0,
-				imageUrl: (r.fields.Image as string | undefined) ?? undefined,
-			}),
-		);
-	}
-} catch (_) {}
+const shopItems = await getShopItems();
 ---
 
 <Layout>
@@ -71,6 +39,9 @@ try {
             <>
               <a href="/review" class="logout">
                 review
+              </a>
+              <a href="/admin/fulfillment" class="logout">
+                fulfillment
               </a>
               <a href="/admin/users" class="logout">
                 admin
@@ -98,22 +69,9 @@ try {
     </header>
 
     <section class="shop">
-      <span class="shop-label">SHOP</span>
-
-      <div class="pi-reward">
-        <div class="pi-reward-info">
-          <p class="pi-reward-name">Raspberry Pi Zero 2W</p>
-          <p class="pi-reward-desc">
-            {shopUnlocked ? "unlocked" : `earn ${SHOP_THRESHOLD} raspberries to unlock`}
-          </p>
-        </div>
-        <div class="progress-track">
-          <div
-            class={`progress-fill${shopUnlocked ? " progress-fill--done" : ""}`}
-            style={`width:${Math.min((raspberryBalance / SHOP_THRESHOLD) * 100, 100)}%`}
-          />
-        </div>
-        <p class="progress-count">{raspberryBalance} / {SHOP_THRESHOLD}</p>
+      <div class="shop-header">
+        <span class="shop-label">SHOP</span>
+        <span class="balance">{raspberryBalance} raspberries</span>
       </div>
 
       {
@@ -121,26 +79,40 @@ try {
           <p class="empty">no items available</p>
         ) : (
           <div class="grid">
-            {shopItems.map((item) => (
-              <div class="item">
-                <div class="item-image">
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} />
-                  ) : (
-                    <span class="fallback">🍓</span>
-                  )}
-                </div>
-                <div class="item-info">
-                  <div>
-                    <p class="item-name">{item.name}</p>
-                    {item.description && (
-                      <p class="item-desc">{item.description}</p>
+            {shopItems.map((item) => {
+              const canAfford = raspberryBalance >= item.price;
+              return (
+                <div class={`item${item.priority ? " item--priority" : ""}`}>
+                  <div class="item-image">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} />
+                    ) : (
+                      <span class="fallback">🍓</span>
                     )}
                   </div>
-                  <p class="item-price">{item.price} raspberries</p>
+                  <div class="item-info">
+                    <div>
+                      <p class={`item-name${item.priority ? " item-name--priority" : ""}`}>{item.name}</p>
+                      {item.description && (
+                        <p class="item-desc">{item.description}</p>
+                      )}
+                    </div>
+                    <div class="item-footer">
+                      <p class={`item-price${item.priority ? " item-price--priority" : ""}`}>{item.price} raspberries</p>
+                      <button
+                        class="btn-buy"
+                        data-item-id={item.id}
+                        data-item-name={item.name}
+                        data-item-price={item.price}
+                        disabled={!canAfford}
+                      >
+                        {canAfford ? "buy" : "not enough"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       }
@@ -224,6 +196,12 @@ try {
       gap: 1.5rem;
     }
 
+    .shop-header {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
     .shop-label {
       font-family: "Syne", sans-serif;
       font-weight: 800;
@@ -232,64 +210,16 @@ try {
       color: #c41e3a;
     }
 
+    .balance {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: #525252;
+    }
+
     .empty {
       font-size: 0.875rem;
       color: #525252;
-      margin: 0;
-    }
-
-    .pi-reward {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-      max-width: 320px;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid #1a1a1a;
-    }
-
-    .pi-reward-info {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-
-    .pi-reward-name {
-      font-family: "Syne", sans-serif;
-      font-weight: 700;
-      font-size: 0.875rem;
-      color: #f5f5f5;
-      margin: 0;
-    }
-
-    .pi-reward-desc {
-      font-size: 0.75rem;
-      color: #525252;
-      margin: 0;
-    }
-
-    .progress-track {
-      height: 3px;
-      background: #1a1a1a;
-      border: 1px solid #262626;
-      width: 100%;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: #c41e3a;
-      transition: width 0.3s ease;
-    }
-
-    .progress-fill--done {
-      background: #22c55e;
-    }
-
-    .progress-count {
-      font-family: "Syne", sans-serif;
-      font-weight: 700;
-      font-size: 0.7rem;
-      color: #404040;
       margin: 0;
     }
 
@@ -357,12 +287,55 @@ try {
       line-height: 1.5;
     }
 
+    .item--priority {
+      border-color: #b8860b;
+    }
+
+    .item-name--priority {
+      color: #ffd700;
+    }
+
     .item-price {
       font-size: 0.8rem;
       color: #c41e3a;
       margin: 0;
       font-family: "Syne", sans-serif;
       font-weight: 700;
+    }
+
+    .item-price--priority {
+      color: #ffd700;
+    }
+
+    .item-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .btn-buy {
+      font-size: 0.7rem;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      background: none;
+      border: 1px solid #c41e3a;
+      color: #c41e3a;
+      padding: 0.25rem 0.75rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-buy:hover:not(:disabled) {
+      background: #c41e3a;
+      color: #f5f5f5;
+    }
+
+    .btn-buy:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: #525252;
+      color: #525252;
     }
   </style>
 
@@ -380,6 +353,43 @@ try {
         });
       });
     }
+
+    document.querySelectorAll<HTMLButtonElement>(".btn-buy").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const itemId = btn.dataset.itemId;
+        const itemName = btn.dataset.itemName;
+        const itemPrice = btn.dataset.itemPrice;
+        if (!itemId) return;
+
+        if (!confirm(`Buy "${itemName}" for ${itemPrice} raspberries?`)) return;
+
+        btn.disabled = true;
+        btn.textContent = "buying...";
+
+        try {
+          const res = await fetch("/api/shop/buy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_id: itemId }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            alert(data.error || "Purchase failed");
+            btn.disabled = false;
+            btn.textContent = "buy";
+            return;
+          }
+          btn.textContent = "purchased!";
+          const balanceEl = document.querySelector(".balance");
+          if (balanceEl) balanceEl.textContent = `${data.new_balance} raspberries`;
+          setTimeout(() => location.reload(), 1000);
+        } catch {
+          alert("Network error");
+          btn.disabled = false;
+          btn.textContent = "buy";
+        }
+      });
+    });
 
     const id =
       document.querySelector<HTMLElement>("[data-slack-id]")?.dataset.slackId;
