@@ -43,10 +43,7 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
 
 	const ok = await updateShopOrderStatus(orderId, parsed.data.status);
 	if (!ok) {
-		return Response.json(
-			{ error: "Failed to update order" },
-			{ status: 500 },
-		);
+		return Response.json({ error: "Failed to update order" }, { status: 500 });
 	}
 
 	return Response.json({ success: true });

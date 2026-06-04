@@ -44,7 +44,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
 	if (user.balance < item.price) {
 		return Response.json(
-			{ error: "Insufficient balance", balance: user.balance, price: item.price },
+			{
+				error: "Insufficient balance",
+				balance: user.balance,
+				price: item.price,
+			},
 			{ status: 400 },
 		);
 	}
@@ -63,14 +67,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
 	const order = await createShopOrder(user.id, item_id);
 	if (!order) {
-		return Response.json(
-			{ error: "Failed to create order" },
-			{ status: 500 },
-		);
+		return Response.json({ error: "Failed to create order" }, { status: 500 });
 	}
 
 	return Response.json(
-		{ success: true, order_id: order.id, new_balance: user.balance - item.price },
+		{
+			success: true,
+			order_id: order.id,
+			new_balance: user.balance - item.price,
+		},
 		{ status: 201 },
 	);
 };

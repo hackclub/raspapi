@@ -118,7 +118,11 @@ export async function upsertUser(
 					body: JSON.stringify({ fields: identity }),
 				});
 				if (!patchRes.ok) {
-					console.error("[upsertUser] Failed to update identity", r.id, patchRes.status);
+					console.error(
+						"[upsertUser] Failed to update identity",
+						r.id,
+						patchRes.status,
+					);
 				}
 			}
 			return parseUserRecord(r);

@@ -8,9 +8,9 @@ const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
 if (!session) return Astro.redirect("/auth/login");
 
 const adminIds = (import.meta.env.ADMIN_IDS ?? "")
-  .split(",")
-  .map((s: string) => s.trim())
-  .filter(Boolean);
+	.split(",")
+	.map((s: string) => s.trim())
+	.filter(Boolean);
 if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
 
 const submissions = await getApprovedSubmissions();
