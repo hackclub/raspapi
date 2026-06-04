@@ -9,7 +9,7 @@ if (!session) return Astro.redirect("/auth/login");
 const userRecord = await getUserBySlackId(session.slack_id);
 const hackatimeConnected = !!userRecord?.hackatime_token;
 
-const raspberryBalance = userRecord?.balance ?? 0;
+const raspberryBalance = Math.floor(userRecord?.balance) ?? 0;
 
 const adminIds = (import.meta.env.ADMIN_IDS ?? "")
 	.split(",")
