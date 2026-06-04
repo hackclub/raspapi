@@ -832,7 +832,9 @@ export async function getLedgerEntriesByUserId(
 			if (type === "project_payout") {
 				const subId = r.fields.payout_submission?.[0];
 				if (subId) {
-					const subRes = await fetch(`${BASE()}/submissions/${subId}`, { headers: HEADERS() });
+					const subRes = await fetch(`${BASE()}/submissions/${subId}`, {
+						headers: HEADERS(),
+					});
 					if (subRes.ok) {
 						const subData = await subRes.json();
 						amount = (subData.fields?.payout as number) ?? null;
@@ -841,7 +843,9 @@ export async function getLedgerEntriesByUserId(
 			} else if (type === "shop_purchase") {
 				const itemId = r.fields.purchased_item?.[0];
 				if (itemId) {
-					const itemRes = await fetch(`${BASE()}/Shop%20Items/${itemId}`, { headers: HEADERS() });
+					const itemRes = await fetch(`${BASE()}/Shop%20Items/${itemId}`, {
+						headers: HEADERS(),
+					});
 					if (itemRes.ok) {
 						const itemData = await itemRes.json();
 						amount = (itemData.fields?.Price as number) ?? null;

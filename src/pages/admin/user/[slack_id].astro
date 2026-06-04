@@ -2,19 +2,19 @@
 import Layout from "../../../layouts/Layout.astro";
 import { getSession } from "../../../lib/session";
 import {
-  getUserBySlackId,
-  getAllProjectsBySlackId,
-  getLedgerEntriesByUserId,
-  getShopOrdersByUserId,
+	getUserBySlackId,
+	getAllProjectsBySlackId,
+	getLedgerEntriesByUserId,
+	getShopOrdersByUserId,
 } from "../../../lib/airtable";
 
 const session = await getSession(Astro.cookies, import.meta.env.SESSION_SECRET);
 if (!session) return Astro.redirect("/auth/login");
 
 const adminIds = (import.meta.env.ADMIN_IDS ?? "")
-  .split(",")
-  .map((s: string) => s.trim())
-  .filter(Boolean);
+	.split(",")
+	.map((s: string) => s.trim())
+	.filter(Boolean);
 if (!adminIds.includes(session.slack_id)) return Astro.redirect("/me");
 
 const { slack_id } = Astro.params;
@@ -24,9 +24,9 @@ const user = await getUserBySlackId(slack_id);
 if (!user) return Astro.redirect("/admin/users");
 
 const [projects, ledger, orders] = await Promise.all([
-  getAllProjectsBySlackId(slack_id),
-  getLedgerEntriesByUserId(user.id),
-  getShopOrdersByUserId(user.id),
+	getAllProjectsBySlackId(slack_id),
+	getLedgerEntriesByUserId(user.id),
+	getShopOrdersByUserId(user.id),
 ]);
 ---
 
