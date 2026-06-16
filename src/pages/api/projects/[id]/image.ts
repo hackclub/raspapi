@@ -37,28 +37,39 @@ export const PUT: APIRoute = async ({ request, cookies, params }) => {
 	}
 
 	// Validate image MIME type and size before processing
-	const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+	const allowedTypes = [
+		"image/jpeg",
+		"image/png",
+		"image/gif",
+		"image/webp",
+		"image/heic",
+		"image/heif",
+	];
 	if (!image.type || !allowedTypes.includes(image.type)) {
 		return Response.json(
 			{
 				error:
-					"Invalid image type. Allowed types are JPEG, PNG, GIF, and WEBP.",
+					"Invalid image type. Allowed types are JPEG, PNG, GIF, WEBP, and HEIC.",
 			},
 			{ status: 400 },
 		);
 	}
 
-	// Enforce a maximum upload size (e.g., 5 MB)
-	const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+	// Enforce a maximum upload size. Phone photos routinely exceed a few MB, so
+	// keep this generous enough that a normal camera image isn't rejected.
+	const MAX_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
 	if (image.size > MAX_IMAGE_SIZE_BYTES) {
 		return Response.json(
-			{ error: "Image file is too large. Maximum size is 5 MB." },
+			{ error: "Image file is too large. Maximum size is 25 MB." },
 			{ status: 413 },
 		);
 	}
 	const ok = await updateProjectImage(id, image);
 	if (!ok) {
-		return Response.json({ error: "Failed to upload image" }, { status: 500 });
+		return Response.json(
+			{ error: "Failed to upload image. Please try again." },
+			{ status: 500 },
+		);
 	}
 	return Response.json({});
 };
