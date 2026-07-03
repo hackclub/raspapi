@@ -135,6 +135,11 @@ const approvedSubmissions = submissions;
                     {sub.project_description && (
                       <p class="description">{sub.project_description}</p>
                     )}
+                    {sub.hackatime_project && (
+                      <p class="hackatime-project">
+                        hackatime: <span>{sub.hackatime_project}</span>
+                      </p>
+                    )}
                     <div class="links">
                       {sub.project_url && (
                         <a
@@ -591,6 +596,17 @@ const approvedSubmissions = submissions;
       color: #737373;
       margin: 0;
       line-height: 1.5;
+    }
+
+    .hackatime-project {
+      font-size: 0.8rem;
+      color: #737373;
+      margin: 0;
+    }
+
+    .hackatime-project span {
+      color: #171717;
+      font-family: monospace;
     }
 
     .links {
@@ -1491,13 +1507,16 @@ const approvedSubmissions = submissions;
 
     document.getElementById("btn-export")!.addEventListener("click", () => {
       const cards = document.querySelectorAll<HTMLElement>(".submission-card");
-      const rows: string[][] = [["name", "code_link", "demo_link", "slack_id"]];
+      const rows: string[][] = [
+        ["name", "code_link", "demo_link", "slack_id", "hackatime_project"],
+      ];
       cards.forEach((card) => {
         rows.push([
           card.dataset.projectName || "",
           card.dataset.repoUrl || "",
           card.dataset.projectUrl || "",
           card.dataset.userSlackId || "",
+          card.dataset.hackatimeProject || "",
         ]);
       });
       const csv = rows
