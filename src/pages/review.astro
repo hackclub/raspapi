@@ -99,6 +99,7 @@ const approvedSubmissions = submissions;
                   data-hackatime-project={sub.hackatime_project ?? ""}
                   data-project-url={sub.project_url ?? ""}
                   data-repo-url={sub.repo_url ?? ""}
+                  data-image-url={sub.image_url ?? ""}
                   data-created-at={sub.created_at ?? ""}
                   data-hackatime-id={hackatimeIdBySlackId.get(sub.user_slack_id) ?? ""}
                 >
@@ -213,6 +214,15 @@ const approvedSubmissions = submissions;
                 class="link hidden">introspect</a
               >
             </div>
+            <a
+              id="review-image-link"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="review-image hidden"
+            >
+              <img id="review-image" alt="submission screenshot" />
+            </a>
             <div id="unified-info" class="unified-info hidden">
               <span class="unified-label">UNIFIED</span>
               <div id="unified-loading" class="unified-loading">
@@ -730,6 +740,19 @@ const approvedSubmissions = submissions;
       margin-top: 0.5rem;
     }
 
+    .review-image {
+      display: block;
+      margin-top: 0.75rem;
+    }
+
+    .review-image img {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 6px;
+      border: 1px solid #262626;
+      object-fit: contain;
+    }
+
     .buff-section h4 {
       font-family: "Syne", sans-serif;
       font-weight: 700;
@@ -1151,6 +1174,7 @@ const approvedSubmissions = submissions;
           const projectName = card.dataset.projectName || "";
           const projectUrl = card.dataset.projectUrl || "";
           const repoUrl = card.dataset.repoUrl || "";
+          const imageUrl = card.dataset.imageUrl || "";
           const userSlackId = card.dataset.userSlackId || "";
 
           document.getElementById("review-project-name")!.textContent =
@@ -1181,6 +1205,21 @@ const approvedSubmissions = submissions;
             repoLink.classList.remove("hidden");
           } else {
             repoLink.classList.add("hidden");
+          }
+
+          const imageLink = document.getElementById(
+            "review-image-link",
+          ) as HTMLAnchorElement;
+          const imageEl = document.getElementById(
+            "review-image",
+          ) as HTMLImageElement;
+          if (imageUrl) {
+            imageLink.href = imageUrl;
+            imageEl.src = imageUrl;
+            imageLink.classList.remove("hidden");
+          } else {
+            imageEl.removeAttribute("src");
+            imageLink.classList.add("hidden");
           }
 
           const introspectLink = document.getElementById(
